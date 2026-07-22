@@ -1,110 +1,110 @@
-# Acta — Transcripció, diarització i actes de reunió amb IA
+# ScribaAI — AI meeting transcription, diarization and minutes
 
-Web app en **Next.js + TypeScript** per gravar una reunió amb un sol botó (toggle), transcriure l'àudio **identificant els diferents interlocutors** i generar automàticament una **acta estructurada** (participants, resum, punts tractats, acords i tasques). Tot funciona amb **AssemblyAI**: transcripció + diarització i redacció de l'acta amb **LeMUR** (LLM de Claude integrat). Un sol proveïdor i una sola clau.
+A **Next.js + TypeScript** web app to record a meeting with a single toggle button, transcribe the audio **identifying the different speakers**, and automatically generate **structured minutes** (participants, summary, discussion points, agreements and tasks). Everything runs on **AssemblyAI**: transcription + diarization, and drafting of the minutes with **LeMUR** (built-in Claude LLM). One provider, one key.
 
-## Com funciona
+## How it works
 
-1. Tries la **durada màxima** de gravació (60 / 90 / 120 / 180 min).
-2. Prems el botó rodó → el navegador captura el micròfon (`MediaRecorder`).
-3. Prems de nou (o s'arriba al límit) → l'àudio s'envia a `/api/transcribe`, que el puja a AssemblyAI i el transcriu amb `speaker_labels` (diarització).
-4. Els segments per interlocutor s'envien a `/api/acta`, on **LeMUR** redacta l'acta en JSON estructurat.
-5. Es mostra l'acta + la transcripció per interlocutors, amb opció d'**exportar a Markdown**.
+1. Pick the **maximum recording length** (60 / 90 / 120 / 180 min).
+2. Press the round button → the browser captures the microphone (`MediaRecorder`).
+3. Press again (or reach the limit) → the audio is sent to `/api/transcribe`, which uploads it to AssemblyAI and transcribes it with `speaker_labels` (diarization).
+4. The per-speaker segments are sent to `/api/acta`, where **LeMUR** drafts the minutes as structured JSON.
+5. The minutes and the per-speaker transcript are displayed, with an option to **export to Markdown**.
 
-La clau d'AssemblyAI viu a les **API routes del servidor**, així mai s'exposa al navegador.
+The AssemblyAI key lives in the **server-side API routes**, so it's never exposed to the browser.
 
-## Configuració
+## Setup
 
 ```bash
 npm install
-cp .env.local.example .env.local   # posa-hi la teva ASSEMBLYAI_API_KEY
+cp .env.local.example .env.local   # add your ASSEMBLYAI_API_KEY
 npm run dev                        # http://localhost:3000
 ```
 
-### Variables d'entorn
+### Environment variables
 
-| Variable | Per defecte | Descripció |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `ASSEMBLYAI_API_KEY` | — | **Obligatòria.** Clau d'API d'AssemblyAI. |
-| `ASSEMBLYAI_LANGUAGE` | `ca` | Idioma de la transcripció. |
-| `ASSEMBLYAI_LEMUR_MODEL` | `anthropic/claude-3-5-sonnet` | Model de LeMUR per l'acta. |
-| `AUTH_PASSWORD_HASH` | — | **Obligatòria.** Hash bcrypt de la contrasenya d'accés. |
-| `AUTH_SECRET` | — | **Obligatòria.** Secret aleatori per signar la cookie de sessió. |
+| `ASSEMBLYAI_API_KEY` | — | **Required.** AssemblyAI API key. |
+| `ASSEMBLYAI_LANGUAGE` | `ca` | Transcription language. |
+| `ASSEMBLYAI_LEMUR_MODEL` | `anthropic/claude-3-5-sonnet` | LeMUR model used for the minutes. |
+| `AUTH_PASSWORD_HASH_B64` | — | **Required.** Base64-encoded bcrypt hash of the access password. |
+| `AUTH_SECRET` | — | **Required.** Random secret used to sign the session cookie. |
 
-### Login (només contrasenya)
+### Login (password only)
 
-L'app està protegida per un **middleware** que bloqueja tot l'accés (pàgines i rutes API) si no has iniciat sessió. Només demana **contrasenya**, que **mai es guarda en clar**: al servidor només hi ha el seu *hash* bcrypt. La sessió va en una cookie signada (`httpOnly`, `secure` en producció).
+The app is protected by a **middleware** that blocks all access (pages and API routes) if you're not logged in. It only asks for a **password**, which is **never stored in plain text**: the server only holds its bcrypt *hash*. The session is kept in a signed cookie (`httpOnly`, `secure` in production).
 
-Configura dues variables a `.env.local`:
+Configure two variables in `.env.local`:
 
 ```bash
-# Hash bcrypt en base64 (evita els '$' que Next interpreta als fitxers .env)
-node -e "console.log(Buffer.from(require('bcryptjs').hashSync(process.argv[1],12)).toString('base64'))" 'LA_TEVA_CONTRASENYA'
+# bcrypt hash in base64 (avoids the '$' that Next expands in .env files)
+node -e "console.log(Buffer.from(require('bcryptjs').hashSync(process.argv[1],12)).toString('base64'))" 'YOUR_PASSWORD'
 
-# Secret aleatori per signar la cookie de sessió
+# Random secret to sign the session cookie
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Enganxa el primer valor a `AUTH_PASSWORD_HASH_B64` i el segon a `AUTH_SECRET`. Per canviar la contrasenya, torna a generar el hash i reinicia l'app. La sessió dura 7 dies; el botó **Sortir** la tanca.
+Paste the first value into `AUTH_PASSWORD_HASH_B64` and the second into `AUTH_SECRET`. To change the password, regenerate the hash and restart the app. The session lasts 7 days; the **Log out** button ends it.
 
-> El hash es guarda en **base64** expressament: el format bcrypt (`$2a$...`) conté `$` que Next expandeix als fitxers `.env` i corromp el valor. Amb base64 no hi ha cap caràcter conflictiu.
+> The hash is stored in **base64** on purpose: the bcrypt format (`$2a$...`) contains `$` characters that Next expands inside `.env` files, corrupting the value. Base64 has no conflicting characters.
 
-### Donar d'alta la clau i controlar la despesa
+### Getting the key and controlling costs
 
-1. Crea un compte a [assemblyai.com](https://www.assemblyai.com) i entra al **Dashboard**.
-2. Copia la teva **API key** a `.env.local` com a `ASSEMBLYAI_API_KEY`.
-3. AssemblyAI funciona amb **crèdit de prepagament**: carrega un import fix (p. ex. 10 $) i, quan s'esgota, les crides s'aturen — així no hi ha rebuts per sorpresa. Revisa a *Billing* si vols activar alertes d'ús.
-4. Control extra al costat de l'app: el **selector de durada** posa un sostre de minuts per reunió i, per tant, de cost.
+1. Create an account at [assemblyai.com](https://www.assemblyai.com) and open the **Dashboard**.
+2. Copy your **API key** into `.env.local` as `ASSEMBLYAI_API_KEY`.
+3. AssemblyAI works on **prepaid credit**: load a fixed amount (e.g. $10) and, when it runs out, calls stop — so there are no surprise bills. Check *Billing* if you want to enable usage alerts.
+4. Extra control on the app side: the **duration selector** caps the minutes per meeting and therefore the cost.
 
-Cost orientatiu: **~0,20–0,50 $ per hora** de reunió (transcripció + diarització + LeMUR).
+Rough cost: **~$0.20–0.50 per hour** of meeting (transcription + diarization + LeMUR).
 
-## Estructura
+## Structure
 
 ```
 src/
   app/
-    page.tsx              # orquestra el flux i el límit de durada
+    page.tsx              # orchestrates the flow and the duration limit
     layout.tsx
     globals.css
     api/
-      transcribe/route.ts # AssemblyAI: upload + transcripció amb diarització
-      acta/route.ts       # LeMUR → acta JSON
+      transcribe/route.ts # AssemblyAI: upload + transcription with diarization
+      acta/route.ts       # LeMUR → minutes JSON
   components/
-    Recorder.tsx          # botó toggle + timer
-    DurationSelector.tsx  # radios de durada màxima
-    ActaView.tsx          # acta + participants + export
+    Recorder.tsx          # toggle button + timer
+    DurationSelector.tsx  # max-duration radios
+    ActaView.tsx          # minutes + participants + export
   hooks/
-    useRecorder.ts        # captura de micròfon
+    useRecorder.ts        # microphone capture
   lib/
-    assemblyai.ts         # upload, transcripció i LeMUR
-    api.ts                # crides fetch des del client
-    types.ts              # tipus compartits
-    format.ts             # timer, Markdown, descàrrega
+    assemblyai.ts         # upload, transcription and LeMUR
+    api.ts                # fetch calls from the client
+    types.ts              # shared types
+    format.ts             # timer, Markdown, download
 ```
 
-## Desplegament a un servidor (Node, p. ex. CloudPanel)
+## Deploying to a server (Node, e.g. CloudPanel)
 
-L'app està pensada per anar en un **servidor Node de llarga durada** (no serverless). El flux de transcripció és asíncron: `/api/transcribe` puja l'àudio i encua la feina (retorna un id ràpid), i el navegador consulta `/api/transcribe/status` cada pocs segons fins que està llesta. Així cap petició queda oberta durant minuts.
+The app is meant to run on a **long-running Node server** (not serverless). The transcription flow is asynchronous: `/api/transcribe` uploads the audio and queues the job (returns an id quickly), and the browser polls `/api/transcribe/status` every few seconds until it's ready. This way no request stays open for minutes.
 
-### Build compacte (output standalone + PM2)
+### Compact build (standalone output + PM2)
 
-Amb `output: "standalone"` (ja configurat a `next.config.mjs`), Next empaqueta només el que cal per executar-se (~30 MB en comptes dels ~370 MB de `node_modules`).
+With `output: "standalone"` (already set in `next.config.mjs`), Next bundles only what's needed to run (~30 MB instead of the ~370 MB of `node_modules`).
 
 ```bash
 npm install
 npm run build
 cp -r .next/static .next/standalone/.next/static
 cp .env.local .next/standalone/.env.local
-rm -rf node_modules .next/cache        # opcional: allibera espai
-pm2 start ecosystem.config.js          # arrenca el server.js empaquetat
+rm -rf node_modules .next/cache        # optional: free up space
+pm2 start ecosystem.config.js          # starts the bundled server.js
 pm2 save
 ```
 
-L'`ecosystem.config.js` ja apunta a `.next/standalone/server.js`, amb `PORT=3000` (ajusta'l a l'App Port de CloudPanel) i `HOSTNAME=0.0.0.0`. Les variables sensibles (claus, hash, secret) es llegeixen del `.env.local` que has copiat dins de `.next/standalone/`.
+`ecosystem.config.js` already points to `.next/standalone/server.js`, with `PORT=3000` (adjust it to the CloudPanel App Port) and `HOSTNAME=0.0.0.0`. Sensitive values (keys, hash, secret) are read from the `.env.local` you copied into `.next/standalone/`.
 
-Punts a configurar:
+Things to configure:
 
-- **HTTPS obligatori.** Sense connexió segura, els navegadors (i sobretot Safari a l'iPhone) **bloquegen el micròfon**. Posa un certificat (p. ex. Let's Encrypt).
-- **nginx com a reverse proxy:** apuja el límit de mida del cos perquè hi càpiga un àudio de 2 h (20–40 MB) i allarga els timeouts:
+- **HTTPS is mandatory.** Without a secure connection, browsers (especially Safari on iPhone) **block the microphone**. Add a certificate (e.g. Let's Encrypt).
+- **nginx as a reverse proxy:** raise the body-size limit so a 2-hour audio file (20–40 MB) fits, and extend the timeouts:
 
   ```nginx
   client_max_body_size 100M;
@@ -112,15 +112,51 @@ Punts a configurar:
   proxy_send_timeout 300s;
   ```
 
-- Arrenca amb `npm run build && npm run start` (idealment sota `pm2` o un servei systemd).
+- Start it with PM2 using the bundled server (`pm2 start ecosystem.config.js`), ideally with boot persistence.
 
-## Ús des de l'iPhone (Safari)
+## Using it from an iPhone (Safari)
 
-- Safari grava en `mp4/aac` (no webm); l'app ho detecta i ho gestiona sol.
-- Mentre graves, l'app activa un **Wake Lock** per mantenir la pantalla encesa. Tot i així, **no bloquegis el telèfon ni canviïs d'app**: iOS suspèn la pàgina i s'aturaria la gravació. Deixa Safari en primer pla tota la reunió.
+- Safari records in `mp4/aac` (not webm); the app detects this and handles it automatically.
+- While recording, the app activates a **Wake Lock** to keep the screen on. Even so, **do not lock the phone or switch apps**: iOS suspends the page and recording would stop. Keep Safari in the foreground for the whole meeting.
 
-## Notes i límits
+## Notes and limits
 
-- La **diarització** retorna etiquetes genèriques (`Interlocutor A`, `B`…). Si algú diu el seu nom durant la reunió, LeMUR intenta mapar-lo al nom real.
-- La transcripció s'atura automàticament en arribar a la durada màxima triada.
-- El *polling* del client espera fins a 35 min que AssemblyAI acabi (ajustable a `src/lib/api.ts`). En la pràctica, 2 h d'àudio es transcriuen en pocs minuts.
+- **Diarization** returns generic labels (`Speaker A`, `B`…). If someone says their name during the meeting, LeMUR tries to map it to the real name.
+- Recording stops automatically when the chosen maximum duration is reached.
+- The client polling waits up to 35 min for AssemblyAI to finish (adjustable in `src/lib/api.ts`). In practice, 2 hours of audio are transcribed in a few minutes.
+
+## License
+
+This project is available under a custom noncommercial software license based on the principles of the PolyForm Noncommercial License 1.0.0.
+
+You may:
+
+- download and use the application for noncommercial purposes;
+- inspect and study its source code;
+- modify it;
+- create forks and derivative works;
+- redistribute original or modified versions for noncommercial purposes.
+
+You may not:
+
+- sell the application or a modified version;
+- charge users for access to it;
+- offer it as a paid hosted service;
+- include it in a commercial product or service;
+- otherwise exploit it commercially without prior written permission.
+
+### Attribution requirement
+
+All copies, forks, modifications, and derivative works must retain the following attribution:
+
+> Original project by Carles Melgarejo Vila
+
+This attribution must remain visible in the application’s **About section or equivalent credits page**.
+
+Modified versions must clearly identify their changes and must not imply that they are official versions maintained or endorsed by the original author.
+
+See [`LICENSE.md`](./LICENSE.md) and [`NOTICE.md`](./NOTICE.md) for the complete terms.
+
+### Commercial licensing
+
+Commercial use requires a separate written license from Carles Melgarejo Vila.
