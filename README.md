@@ -2,6 +2,9 @@
 
 A **Next.js + TypeScript** web app to record a meeting with a single toggle button, transcribe the audio **identifying the different speakers**, and automatically generate **structured minutes** (participants, summary, discussion points, agreements and tasks). Everything runs on **AssemblyAI**: transcription + diarization, and drafting of the minutes with **LeMUR** (built-in Claude LLM). One provider, one key.
 
+> [!IMPORTANT]
+> **This web app is currently in a testing phase.** Features, behaviour, configuration and output formats may change, and errors or unexpected results may still occur. It is not yet recommended for critical or production use.
+
 ## How it works
 
 1. Pick the **maximum recording length** (60 / 90 / 120 / 180 min).
