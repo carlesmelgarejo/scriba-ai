@@ -285,9 +285,15 @@ button {
 /* Reproductor d'àudio */
 .audio-block {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
   margin-bottom: 18px;
+}
+
+/* Mateixa alçada per al reproductor i el botó d'àudio */
+.audio-block .player,
+.audio-block .btn {
+  height: 44px;
 }
 
 /* Reproductor propi (fons amb el to del logo) */
@@ -297,14 +303,14 @@ button {
   gap: 10px;
   flex: 1;
   min-width: 0;
-  padding: 8px 12px;
+  padding: 0 12px;
   border-radius: 12px;
   background: var(--audio-bg);
 }
 
 .player-btn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: none;
   display: grid;
