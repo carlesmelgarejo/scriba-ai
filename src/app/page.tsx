@@ -139,6 +139,15 @@ export default function Home() {
         <div className="header-nav">
           <ThemeToggle />
           <button type="button" className="btn ghost logout" onClick={handleLogout}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M15 12H3m0 0l3.5-3.5M3 12l3.5 3.5M10 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-2"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
             Sortir
           </button>
         </div>

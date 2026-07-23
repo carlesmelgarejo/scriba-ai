@@ -13,6 +13,7 @@
   --warn-bg: rgba(255, 193, 94, 0.12);
   --warn-border: rgba(255, 193, 94, 0.4);
   --warn-text: #ffdca6;
+  --audio-bg: rgba(120, 130, 255, 0.22); /* to del logo (blau-violeta) */
   --radius: 18px;
   --shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
 }
@@ -32,6 +33,7 @@
   --warn-bg: rgba(190, 130, 20, 0.12);
   --warn-border: rgba(190, 130, 20, 0.35);
   --warn-text: #7a5300;
+  --audio-bg: rgba(99, 118, 235, 0.16); /* to del logo, més suau en clar */
   --shadow: 0 20px 45px -22px rgba(30, 40, 80, 0.35);
 }
 
@@ -294,6 +296,16 @@ button {
   min-width: 0;
   border-radius: 12px;
   overflow: hidden;
+  background: var(--audio-bg);
+}
+
+/* Tinta la barra de controls nativa (WebKit/Chrome/Safari) amb el to del logo */
+.audio-player::-webkit-media-controls-enclosure {
+  border-radius: 12px;
+}
+
+.audio-player::-webkit-media-controls-panel {
+  background: var(--audio-bg);
 }
 
 @media (max-width: 760px) {
@@ -844,10 +856,6 @@ button {
 }
 
 /* ---- Ajustos del tema clar (contrast i tonalitats) ---- */
-:root[data-theme="light"] .audio-player {
-  background: var(--bg-soft);
-}
-
 :root[data-theme="light"] .tag {
   background: rgba(69, 96, 224, 0.12);
   color: #2f409a;
