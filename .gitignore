@@ -4,5 +4,6 @@ next-env.d.ts
 out
 .env
 .env.local
+data
 *.log
 .DS_Store

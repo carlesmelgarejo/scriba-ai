@@ -1,10 +1,10 @@
 import type { Utterance } from "./types";
 
 const BASE = "https://api.assemblyai.com";
+const LLM_GATEWAY = "https://llm-gateway.assemblyai.com/v1/chat/completions";
 
 export const LANGUAGE = process.env.ASSEMBLYAI_LANGUAGE ?? "ca";
-export const LEMUR_MODEL =
-  process.env.ASSEMBLYAI_LEMUR_MODEL ?? "anthropic/claude-3-5-sonnet";
+export const LLM_MODEL = process.env.ASSEMBLYAI_LLM_MODEL ?? "qwen3-32B";
 
 function apiKey(): string {
   const key = process.env.ASSEMBLYAI_API_KEY;
@@ -37,15 +37,25 @@ interface TranscriptResult {
   utterances?: { speaker: string; text: string }[];
 }
 
-async function createTranscript(audioUrl: string): Promise<string> {
+async function createTranscript(
+  audioUrl: string,
+  maxSpeakers?: number
+): Promise<string> {
+  const body: Record<string, unknown> = {
+    audio_url: audioUrl,
+    speaker_labels: true,
+    language_code: LANGUAGE,
+  };
+  // Límit superior de participants (no un nombre exacte): acota la diarització
+  // sense forçar el model a inventar interlocutors si no parlen tots.
+  if (maxSpeakers && maxSpeakers >= 2) {
+    body.speaker_options = { max_speakers_expected: maxSpeakers };
+  }
+
   const res = await fetch(`${BASE}/v2/transcript`, {
     method: "POST",
     headers: headers(true),
-    body: JSON.stringify({
-      audio_url: audioUrl,
-      speaker_labels: true,
-      language_code: LANGUAGE,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Error creant la transcripció (${res.status})`);
   const data = (await res.json()) as { id: string };
@@ -60,9 +70,12 @@ export interface TranscriptionStatus {
 }
 
 /** Puja l'àudio i encua la transcripció; retorna l'id de la feina. */
-export async function startTranscription(file: File): Promise<string> {
+export async function startTranscription(
+  file: File,
+  speakersExpected?: number
+): Promise<string> {
   const audioUrl = await uploadAudio(file);
-  return createTranscript(audioUrl);
+  return createTranscript(audioUrl, speakersExpected);
 }
 
 /** Consulta l'estat d'una transcripció i, si està llesta, retorna el resultat. */
@@ -86,24 +99,32 @@ export async function getTranscriptionStatus(
   };
 }
 
-/** Genera text lliure amb LeMUR a partir d'un prompt i un text d'entrada. */
-export async function lemurTask(
+/**
+ * Genera text a partir d'un prompt i un text d'entrada amb l'LLM Gateway
+ * d'AssemblyAI (compatible amb OpenAI, mateixa clau d'API).
+ */
+export async function generateWithLLM(
   inputText: string,
   prompt: string
 ): Promise<string> {
-  const res = await fetch(`${BASE}/lemur/v3/generate/task`, {
+  const res = await fetch(LLM_GATEWAY, {
     method: "POST",
     headers: headers(true),
     body: JSON.stringify({
-      input_text: inputText,
-      prompt,
-      final_model: LEMUR_MODEL,
+      model: LLM_MODEL,
+      max_tokens: 2000,
+      messages: [
+        { role: "system", content: prompt },
+        { role: "user", content: `Transcripció de la reunió:\n\n${inputText}` },
+      ],
     }),
   });
   if (!res.ok) {
     const detail = await res.text();
-    throw new Error(`Error de LeMUR (${res.status}): ${detail}`);
+    throw new Error(`Error de l'LLM Gateway (${res.status}): ${detail}`);
   }
-  const data = (await res.json()) as { response: string };
-  return data.response;
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  return data.choices?.[0]?.message?.content ?? "";
 }

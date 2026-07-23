@@ -4,26 +4,37 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRecorder } from "@/hooks/useRecorder";
 import { Recorder } from "@/components/Recorder";
 import { DurationSelector } from "@/components/DurationSelector";
+import { SpeakerSelector } from "@/components/SpeakerSelector";
 import { ActaView } from "@/components/ActaView";
-import { transcribeAudio, generateActa } from "@/lib/api";
-import type { Acta, Utterance, DurationOption } from "@/lib/types";
+import { HistorySidebar } from "@/components/HistorySidebar";
+import { transcribeAudio, generateActa, getMeeting } from "@/lib/api";
+import type { Acta, Utterance, DurationOption, SpeakerOption } from "@/lib/types";
 
 type Phase = "idle" | "recording" | "transcribing" | "generating" | "done";
+
+interface Viewing {
+  id: string | null;
+  acta: Acta;
+  utterances: Utterance[];
+  hasAudio: boolean;
+}
 
 const STATUS_TEXT: Record<Phase, string> = {
   idle: "Prem el botó per començar a gravar la reunió.",
   recording: "Gravant… prem de nou per aturar i generar l'acta.",
   transcribing: "Transcrivint i identificant interlocutors…",
   generating: "Redactant l'acta…",
-  done: "Acta generada. Pots exportar-la o iniciar una nova reunió.",
+  done: "Acta generada i desada a l'històric.",
 };
 
 export default function Home() {
   const recorder = useRecorder();
   const [phase, setPhase] = useState<Phase>("idle");
   const [limitMinutes, setLimitMinutes] = useState<DurationOption>(60);
-  const [utterances, setUtterances] = useState<Utterance[]>([]);
-  const [acta, setActa] = useState<Acta | null>(null);
+  const [speakers, setSpeakers] = useState<SpeakerOption>(0);
+  const [viewing, setViewing] = useState<Viewing | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reloadSignal, setReloadSignal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const autoStopped = useRef(false);
 
@@ -39,18 +50,25 @@ export default function Home() {
 
     try {
       setPhase("transcribing");
-      const result = await transcribeAudio(blob);
-      setUtterances(result.utterances);
+      const result = await transcribeAudio(blob, speakers);
 
       setPhase("generating");
-      const generated = await generateActa(result.utterances);
-      setActa(generated);
+      const generated = await generateActa(result.utterances, result.audioToken);
+
+      setViewing({
+        id: generated.id,
+        acta: generated.acta,
+        utterances: result.utterances,
+        hasAudio: !!result.audioToken,
+      });
+      setSelectedId(generated.id);
+      setReloadSignal((n) => n + 1);
       setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperat");
       setPhase("idle");
     }
-  }, [recorder]);
+  }, [recorder, speakers]);
 
   // Aturada automàtica en arribar al límit de durada seleccionat.
   useEffect(() => {
@@ -70,17 +88,31 @@ export default function Home() {
       await runPipeline();
       return;
     }
-    setActa(null);
-    setUtterances([]);
+    setViewing(null);
+    setSelectedId(null);
     await recorder.start();
     setPhase("recording");
   }
 
-  function handleReset() {
-    setActa(null);
-    setUtterances([]);
+  async function handleSelect(id: string | null) {
     setError(null);
-    setPhase("idle");
+    setSelectedId(id);
+    if (!id) {
+      setViewing(null);
+      return;
+    }
+    try {
+      const m = await getMeeting(id);
+      setViewing({
+        id: m.id,
+        acta: m.acta,
+        utterances: m.utterances,
+        hasAudio: !!m.hasAudio,
+      });
+      setPhase("idle");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No s'ha pogut carregar");
+    }
   }
 
   async function handleLogout() {
@@ -111,52 +143,66 @@ export default function Home() {
             Grava la reunió i obté la transcripció amb interlocutors i l&apos;acta.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn ghost logout"
-          onClick={handleLogout}
-        >
+        <button type="button" className="btn ghost logout" onClick={handleLogout}>
           Sortir
         </button>
       </div>
 
-      <div className="card">
-        <DurationSelector
-          value={limitMinutes}
-          disabled={recorder.state === "recording" || busy}
-          onChange={setLimitMinutes}
+      <div className="layout">
+        <HistorySidebar
+          reloadSignal={reloadSignal}
+          selectedId={selectedId}
+          onSelect={handleSelect}
         />
 
-        <Recorder
-          state={recorder.state}
-          seconds={recorder.seconds}
-          disabled={busy}
-          onToggle={handleToggle}
-        />
+        <div className="main-col">
+          <div className="card">
+            <DurationSelector
+              value={limitMinutes}
+              disabled={recorder.state === "recording" || busy}
+              onChange={setLimitMinutes}
+            />
 
-        <div className="status">
-          {busy ? (
-            <span className="busy">
-              <span className="spinner" />
-              {STATUS_TEXT[phase]}
-            </span>
-          ) : (
-            recorder.error ?? STATUS_TEXT[phase]
+            <SpeakerSelector
+              value={speakers}
+              disabled={recorder.state === "recording" || busy}
+              onChange={setSpeakers}
+            />
+
+            <Recorder
+              state={recorder.state}
+              seconds={recorder.seconds}
+              disabled={busy}
+              onToggle={handleToggle}
+            />
+
+            <div className="status">
+              {busy ? (
+                <span className="busy">
+                  <span className="spinner" />
+                  {STATUS_TEXT[phase]}
+                </span>
+              ) : (
+                recorder.error ?? STATUS_TEXT[phase]
+              )}
+            </div>
+
+            {error && <div className="error">{error}</div>}
+          </div>
+
+          {viewing && (
+            <ActaView
+              acta={viewing.acta}
+              utterances={viewing.utterances}
+              audioUrl={
+                viewing.hasAudio && viewing.id
+                  ? `/api/meetings/${viewing.id}/audio`
+                  : undefined
+              }
+            />
           )}
         </div>
-
-        {phase === "done" && (
-          <div className="footer-actions" style={{ justifyContent: "center" }}>
-            <button type="button" className="btn ghost" onClick={handleReset}>
-              Nova reunió
-            </button>
-          </div>
-        )}
-
-        {error && <div className="error">{error}</div>}
       </div>
-
-      {acta && <ActaView acta={acta} utterances={utterances} />}
     </main>
   );
 }

@@ -49,9 +49,21 @@ Contingut (el hash va en **base64** per evitar que Next interpreti els `$`):
 ```
 ASSEMBLYAI_API_KEY=la_teva_clau
 ASSEMBLYAI_LANGUAGE=ca
+ASSEMBLYAI_LLM_MODEL=qwen3-32B
 AUTH_PASSWORD_HASH_B64=el_hash_en_base64
 AUTH_SECRET=els_64_hex
+SCRIBA_DATA_DIR=/home/scribaai/htdocs/scribaai.elclic.net/data
 ```
+
+> **Històric (dades persistents):** `SCRIBA_DATA_DIR` ha d'apuntar a una carpeta
+> FORA de `.next` (com la d'aquí, a l'arrel del site). Així les reunions desades
+> (JSON + Markdown + àudio Opus) sobreviuen a cada `deploy.sh`, que reconstrueix
+> `.next`. Si no la poses, es desarien dins de `.next/standalone/data` i es perdrien
+> en redesplegar.
+
+> **Àudio (ffmpeg):** per desar l'àudio de cada reunió en Opus cal `ffmpeg` al
+> servidor: `sudo apt install ffmpeg` (un cop, com a root/admin). Si no hi és,
+> l'app funciona igual però no desa àudio. Comprova-ho amb `ffmpeg -version`.
 
 Genera els valors:
 

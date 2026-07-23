@@ -49,6 +49,29 @@ export function actaToMarkdown(acta: Acta, utterances: Utterance[]): string {
   return lines.join("\n");
 }
 
+/** Converteix només la transcripció per interlocutors en Markdown. */
+export function transcriptToMarkdown(
+  utterances: Utterance[],
+  title = "Transcripció"
+): string {
+  const lines: string[] = [`# ${title}`, ""];
+  utterances.forEach((u) => lines.push(`**${u.speaker}:** ${u.text}`, ""));
+  return lines.join("\n");
+}
+
+/** Genera un slug per als noms de fitxer. */
+export function slugify(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "reunio"
+  );
+}
+
 export function downloadText(filename: string, text: string): void {
   const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
