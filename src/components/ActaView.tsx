@@ -38,7 +38,28 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function ExportButton({ label, onClick }: { label: string; onClick: () => void }) {
+function DownloadIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M7 18.5a4.2 4.2 0 0 1-.8-8.32 5.2 5.2 0 0 1 10.1-1.03A3.8 3.8 0 0 1 16.8 18.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 11v6m0 0l-2.3-2.3M12 17l2.3-2.3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ExportButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
@@ -48,7 +69,7 @@ function ExportButton({ label, onClick }: { label: string; onClick: () => void }
         onClick();
       }}
     >
-      ↓ {label}
+      <DownloadIcon /> Descarrega
     </button>
   );
 }
@@ -174,7 +195,7 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
             href={audioUrl}
             download={`audio-${slug}.opus`}
           >
-            ↓ Àudio
+            <DownloadIcon /> Descarrega
           </a>
         </div>
       )}
@@ -212,7 +233,7 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
           title="Acta"
           card={false}
           defaultOpen
-          actions={<ExportButton label="Exportar" onClick={exportActa} />}
+          actions={<ExportButton onClick={exportActa} />}
         >
           {acta.participants.length > 0 && (
             <div className="participants">
@@ -269,7 +290,7 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
           title="Transcripció"
           card={false}
           actions={
-            <ExportButton label="Exportar" onClick={exportTranscript} />
+            <ExportButton onClick={exportTranscript} />
           }
         >
           <div className="transcript">
