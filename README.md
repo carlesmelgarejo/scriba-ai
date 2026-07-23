@@ -79,7 +79,7 @@ Paste the first value into `AUTH_PASSWORD_HASH_B64` and the second into `AUTH_SE
 4. AssemblyAI works on **prepaid credit**: load a fixed amount (e.g. $10) and, when it runs out, calls stop — so there are no surprise bills (keep auto-refill off for a hard cap).
 5. Extra control on the app side: the **duration selector** caps the minutes per meeting and therefore the cost.
 
-Rough cost with `qwen3-32B`: **~$0.35 for a 2-hour meeting** (transcription + diarization is the bulk; the minutes are a fraction of a cent).
+Rough cost with `claude-haiku-4-5-20251001` for the minutes: **~$0.38 for a 2-hour meeting** — transcription + diarization is the bulk (~$0.34) and the minutes add only a few cents (~$0.04 for ~30k input + ~1.5k output tokens at $1 / $5 per 1M). With a cheaper model like `qwen3-32B` the minutes are a fraction of a cent (total ~$0.35).
 
 ## Structure
 

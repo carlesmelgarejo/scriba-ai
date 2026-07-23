@@ -292,6 +292,8 @@ button {
   flex: 1;
   height: 40px;
   min-width: 0;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 @media (max-width: 760px) {
@@ -839,4 +841,34 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---- Ajustos del tema clar (contrast i tonalitats) ---- */
+:root[data-theme="light"] .audio-player {
+  background: var(--bg-soft);
+}
+
+:root[data-theme="light"] .tag {
+  background: rgba(69, 96, 224, 0.12);
+  color: #2f409a;
+}
+
+:root[data-theme="light"] .tag.date {
+  background: rgba(23, 168, 132, 0.14);
+  color: #0f6b4c;
+}
+
+:root[data-theme="light"] .status-pill {
+  background: rgba(20, 30, 60, 0.08);
+  color: #4a5470;
+}
+
+:root[data-theme="light"] .status-pill.status-transcribing {
+  background: rgba(69, 96, 224, 0.14);
+  color: #2f409a;
+}
+
+:root[data-theme="light"] .status-pill.status-done {
+  background: rgba(23, 168, 132, 0.16);
+  color: #0f6b4c;
 }
