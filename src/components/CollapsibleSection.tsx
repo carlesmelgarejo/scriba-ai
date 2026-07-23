@@ -5,6 +5,7 @@ import { useState } from "react";
 interface CollapsibleSectionProps {
   title: string;
   defaultOpen?: boolean;
+  card?: boolean; // true = secció amb caixa pròpia; false = bloc dins d'una caixa
   actions?: React.ReactNode;
   children: React.ReactNode;
 }
@@ -12,13 +13,14 @@ interface CollapsibleSectionProps {
 export function CollapsibleSection({
   title,
   defaultOpen = false,
+  card = true,
   actions,
   children,
 }: CollapsibleSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className="card">
+    <section className={card ? "card" : "collapsible-block"}>
       <div className="section-head">
         <button
           type="button"

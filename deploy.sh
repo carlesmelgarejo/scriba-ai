@@ -8,12 +8,21 @@ cd "$(dirname "$0")"
 echo "▸ Instal·lant dependències…"
 npm install
 
+echo "▸ Netejant build anterior…"
+rm -rf .next
+
 echo "▸ Compilant (build)…"
 npm run build
 
 echo "▸ Copiant assets estàtics al standalone…"
+# Neteja el destí abans de copiar per evitar imbricacions (.next/static/static)
+# i assets vells que no coincideixin amb el build actual.
+rm -rf .next/standalone/.next/static
 cp -r .next/static .next/standalone/.next/static
-[ -d public ] && cp -r public .next/standalone/public
+if [ -d public ]; then
+  rm -rf .next/standalone/public
+  cp -r public .next/standalone/public
+fi
 
 if [ -f .env.local ]; then
   echo "▸ Copiant .env.local al standalone…"

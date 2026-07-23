@@ -143,14 +143,15 @@ button {
 }
 
 .history-delete {
+  display: inline-grid;
+  place-items: center;
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 4px;
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .history-delete:hover {
@@ -158,14 +159,66 @@ button {
   background: rgba(255, 84, 112, 0.12);
 }
 
+/* Caixa d'una reunió */
+.meeting-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.meeting-title-main {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+/* Blocs plegables dins d'una caixa */
+.collapsible-block {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+
+.collapsible-block:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
 /* Reproductor d'àudio */
-.audio-card .section-head {
-  margin-bottom: 12px;
+.audio-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .audio-player {
-  width: 100%;
+  flex: 1;
   height: 40px;
+  min-width: 0;
 }
 
 @media (max-width: 760px) {

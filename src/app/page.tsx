@@ -115,6 +115,12 @@ export default function Home() {
     }
   }
 
+  function handleClose() {
+    setViewing(null);
+    setSelectedId(null);
+    setPhase("idle");
+  }
+
   async function handleLogout() {
     await fetch("/api/logout", { method: "POST" });
     window.location.href = "/login";
@@ -156,41 +162,7 @@ export default function Home() {
         />
 
         <div className="main-col">
-          <div className="card">
-            <DurationSelector
-              value={limitMinutes}
-              disabled={recorder.state === "recording" || busy}
-              onChange={setLimitMinutes}
-            />
-
-            <SpeakerSelector
-              value={speakers}
-              disabled={recorder.state === "recording" || busy}
-              onChange={setSpeakers}
-            />
-
-            <Recorder
-              state={recorder.state}
-              seconds={recorder.seconds}
-              disabled={busy}
-              onToggle={handleToggle}
-            />
-
-            <div className="status">
-              {busy ? (
-                <span className="busy">
-                  <span className="spinner" />
-                  {STATUS_TEXT[phase]}
-                </span>
-              ) : (
-                recorder.error ?? STATUS_TEXT[phase]
-              )}
-            </div>
-
-            {error && <div className="error">{error}</div>}
-          </div>
-
-          {viewing && (
+          {viewing ? (
             <ActaView
               acta={viewing.acta}
               utterances={viewing.utterances}
@@ -199,7 +171,42 @@ export default function Home() {
                   ? `/api/meetings/${viewing.id}/audio`
                   : undefined
               }
+              onClose={handleClose}
             />
+          ) : (
+            <div className="card">
+              <DurationSelector
+                value={limitMinutes}
+                disabled={recorder.state === "recording" || busy}
+                onChange={setLimitMinutes}
+              />
+
+              <SpeakerSelector
+                value={speakers}
+                disabled={recorder.state === "recording" || busy}
+                onChange={setSpeakers}
+              />
+
+              <Recorder
+                state={recorder.state}
+                seconds={recorder.seconds}
+                disabled={busy}
+                onToggle={handleToggle}
+              />
+
+              <div className="status">
+                {busy ? (
+                  <span className="busy">
+                    <span className="spinner" />
+                    {STATUS_TEXT[phase]}
+                  </span>
+                ) : (
+                  recorder.error ?? STATUS_TEXT[phase]
+                )}
+              </div>
+
+              {error && <div className="error">{error}</div>}
+            </div>
           )}
         </div>
       </div>

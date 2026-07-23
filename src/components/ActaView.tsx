@@ -13,6 +13,7 @@ interface ActaViewProps {
   acta: Acta;
   utterances: Utterance[];
   audioUrl?: string;
+  onClose?: () => void;
 }
 
 function ExportButton({ onClick }: { onClick: () => void }) {
@@ -30,7 +31,7 @@ function ExportButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function ActaView({ acta, utterances, audioUrl }: ActaViewProps) {
+export function ActaView({ acta, utterances, audioUrl, onClose }: ActaViewProps) {
   const slug = slugify(acta.titol);
 
   const exportActa = () =>
@@ -42,28 +43,46 @@ export function ActaView({ acta, utterances, audioUrl }: ActaViewProps) {
     );
 
   return (
-    <div className="results">
+    <section className="card meeting-card">
+      <div className="meeting-header">
+        <h2 className="meeting-title-main">{acta.titol}</h2>
+        {onClose && (
+          <button
+            type="button"
+            className="icon-btn close-btn"
+            onClick={onClose}
+            aria-label="Tancar"
+            title="Tancar"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        )}
+      </div>
+
       {audioUrl && (
-        <section className="card audio-card">
-          <div className="section-head">
-            <span className="section-title">Àudio</span>
-            <a className="btn" href={audioUrl} download={`audio-${slug}.opus`}>
-              ↓ Descarregar
-            </a>
-          </div>
+        <div className="audio-block">
           <audio className="audio-player" controls preload="none" src={audioUrl}>
             El navegador no pot reproduir aquest àudio.
           </audio>
-        </section>
+          <a className="btn" href={audioUrl} download={`audio-${slug}.opus`}>
+            ↓ Àudio
+          </a>
+        </div>
       )}
 
       <CollapsibleSection
         title="Acta"
+        card={false}
         defaultOpen
         actions={<ExportButton onClick={exportActa} />}
       >
-        <h3 className="acta-title">{acta.titol}</h3>
-
         {acta.participants.length > 0 && (
           <div className="participants">
             {acta.participants.map((p, i) => (
@@ -118,6 +137,7 @@ export function ActaView({ acta, utterances, audioUrl }: ActaViewProps) {
 
       <CollapsibleSection
         title="Transcripció"
+        card={false}
         actions={
           utterances.length > 0 ? (
             <ExportButton onClick={exportTranscript} />
@@ -137,6 +157,6 @@ export function ActaView({ acta, utterances, audioUrl }: ActaViewProps) {
           )}
         </div>
       </CollapsibleSection>
-    </div>
+    </section>
   );
 }
