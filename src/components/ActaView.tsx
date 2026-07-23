@@ -18,6 +18,7 @@ import {
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ProcessingWarning } from "./ProcessingWarning";
+import { AudioPlayer } from "./AudioPlayer";
 
 interface MeetingViewProps {
   meeting: Meeting;
@@ -167,9 +168,7 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
 
       {audioUrl && (
         <div className="audio-block">
-          <audio className="audio-player" controls preload="none" src={audioUrl}>
-            El navegador no pot reproduir aquest àudio.
-          </audio>
+          <AudioPlayer src={audioUrl} />
           <a
             className="btn btn-action"
             href={audioUrl}
