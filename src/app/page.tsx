@@ -2,73 +2,60 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRecorder } from "@/hooks/useRecorder";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import { Recorder } from "@/components/Recorder";
 import { DurationSelector } from "@/components/DurationSelector";
 import { SpeakerSelector } from "@/components/SpeakerSelector";
-import { ActaView } from "@/components/ActaView";
+import { MeetingView } from "@/components/ActaView";
 import { HistorySidebar } from "@/components/HistorySidebar";
-import { transcribeAudio, generateActa, getMeeting } from "@/lib/api";
-import type { Acta, Utterance, DurationOption, SpeakerOption } from "@/lib/types";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ProcessingWarning } from "@/components/ProcessingWarning";
+import { saveAudioMeeting, getMeeting } from "@/lib/api";
+import type { Meeting, DurationOption, SpeakerOption } from "@/lib/types";
 
-type Phase = "idle" | "recording" | "transcribing" | "generating" | "done";
-
-interface Viewing {
-  id: string | null;
-  acta: Acta;
-  utterances: Utterance[];
-  hasAudio: boolean;
-}
+type Phase = "idle" | "recording" | "saving";
 
 const STATUS_TEXT: Record<Phase, string> = {
   idle: "Prem el botó per començar a gravar la reunió.",
-  recording: "Gravant… prem de nou per aturar i generar l'acta.",
-  transcribing: "Transcrivint i identificant interlocutors…",
-  generating: "Redactant l'acta…",
-  done: "Acta generada i desada a l'històric.",
+  recording: "Gravant… prem de nou per aturar i desar l'àudio.",
+  saving: "Desant l'àudio…",
 };
 
 export default function Home() {
   const recorder = useRecorder();
+  const wake = useWakeLock();
   const [phase, setPhase] = useState<Phase>("idle");
   const [limitMinutes, setLimitMinutes] = useState<DurationOption>(60);
   const [speakers, setSpeakers] = useState<SpeakerOption>(0);
-  const [viewing, setViewing] = useState<Viewing | null>(null);
+  const [viewing, setViewing] = useState<Meeting | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reloadSignal, setReloadSignal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const autoStopped = useRef(false);
 
-  const busy = phase === "transcribing" || phase === "generating";
-
-  const runPipeline = useCallback(async () => {
+  const saveRecording = useCallback(async () => {
+    const durationSec = recorder.seconds;
     const blob = await recorder.stop();
     if (!blob || blob.size === 0) {
       setPhase("idle");
       setError("No s'ha capturat àudio.");
+      await wake.release();
       return;
     }
-
     try {
-      setPhase("transcribing");
-      const result = await transcribeAudio(blob, speakers);
-
-      setPhase("generating");
-      const generated = await generateActa(result.utterances, result.audioToken);
-
-      setViewing({
-        id: generated.id,
-        acta: generated.acta,
-        utterances: result.utterances,
-        hasAudio: !!result.audioToken,
-      });
-      setSelectedId(generated.id);
+      setPhase("saving"); // el Wake Lock segueix actiu durant el desat
+      const meeting = await saveAudioMeeting(blob, speakers, durationSec);
+      setViewing(meeting);
+      setSelectedId(meeting.id);
       setReloadSignal((n) => n + 1);
-      setPhase("done");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error inesperat");
       setPhase("idle");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error desant l'àudio");
+      setPhase("idle");
+    } finally {
+      await wake.release();
     }
-  }, [recorder, speakers]);
+  }, [recorder, speakers, wake]);
 
   // Aturada automàtica en arribar al límit de durada seleccionat.
   useEffect(() => {
@@ -78,18 +65,19 @@ export default function Home() {
     }
     if (recorder.seconds >= limitMinutes * 60 && !autoStopped.current) {
       autoStopped.current = true;
-      void runPipeline();
+      void saveRecording();
     }
-  }, [phase, recorder.seconds, limitMinutes, runPipeline]);
+  }, [phase, recorder.seconds, limitMinutes, saveRecording]);
 
   async function handleToggle() {
     setError(null);
     if (recorder.state === "recording") {
-      await runPipeline();
+      await saveRecording();
       return;
     }
     setViewing(null);
     setSelectedId(null);
+    await wake.acquire(); // dins del gest de l'usuari (necessari a iOS)
     await recorder.start();
     setPhase("recording");
   }
@@ -102,29 +90,28 @@ export default function Home() {
       return;
     }
     try {
-      const m = await getMeeting(id);
-      setViewing({
-        id: m.id,
-        acta: m.acta,
-        utterances: m.utterances,
-        hasAudio: !!m.hasAudio,
-      });
-      setPhase("idle");
+      setViewing(await getMeeting(id));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No s'ha pogut carregar");
     }
   }
 
+  function handleUpdated(m: Meeting) {
+    setViewing(m);
+    setReloadSignal((n) => n + 1);
+  }
+
   function handleClose() {
     setViewing(null);
     setSelectedId(null);
-    setPhase("idle");
   }
 
   async function handleLogout() {
     await fetch("/api/logout", { method: "POST" });
     window.location.href = "/login";
   }
+
+  const busy = phase === "saving";
 
   return (
     <main className="container">
@@ -146,12 +133,15 @@ export default function Home() {
         <div className="header-text">
           <h1 className="title">ScribaAI</h1>
           <p className="subtitle">
-            Grava la reunió i obté la transcripció amb interlocutors i l&apos;acta.
+            Grava la reunió; transcriu i genera l&apos;acta quan vulguis.
           </p>
         </div>
-        <button type="button" className="btn ghost logout" onClick={handleLogout}>
-          Sortir
-        </button>
+        <div className="header-nav">
+          <ThemeToggle />
+          <button type="button" className="btn ghost logout" onClick={handleLogout}>
+            Sortir
+          </button>
+        </div>
       </div>
 
       <div className="layout">
@@ -163,15 +153,10 @@ export default function Home() {
 
         <div className="main-col">
           {viewing ? (
-            <ActaView
-              acta={viewing.acta}
-              utterances={viewing.utterances}
-              audioUrl={
-                viewing.hasAudio && viewing.id
-                  ? `/api/meetings/${viewing.id}/audio`
-                  : undefined
-              }
+            <MeetingView
+              meeting={viewing}
               onClose={handleClose}
+              onUpdated={handleUpdated}
             />
           ) : (
             <div className="card">
@@ -204,6 +189,8 @@ export default function Home() {
                   recorder.error ?? STATUS_TEXT[phase]
                 )}
               </div>
+
+              {(recorder.state === "recording" || busy) && <ProcessingWarning />}
 
               {error && <div className="error">{error}</div>}
             </div>

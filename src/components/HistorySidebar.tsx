@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listMeetings, deleteMeeting } from "@/lib/api";
-import type { MeetingSummary } from "@/lib/types";
+import type { MeetingSummary, MeetingStatus } from "@/lib/types";
+
+const STATUS_LABEL: Record<MeetingStatus, string> = {
+  audio: "Àudio",
+  transcribing: "Transcrivint…",
+  transcribed: "Transcrit",
+  done: "Acta",
+};
 
 interface HistorySidebarProps {
   reloadSignal: number;
@@ -68,10 +75,19 @@ export function HistorySidebar({
             onClick={() => onSelect(m.id)}
           >
             <div className="history-main">
-              <span className="history-title">{m.titol}</span>
+              <span className="history-title">
+                {m.title || formatDate(m.createdAt)}
+              </span>
               <span className="history-date">
                 {formatDate(m.createdAt)}
-                {m.hasAudio && <span className="audio-dot" title="Amb àudio">♪</span>}
+                <span className={`status-pill status-${m.status}`}>
+                  {STATUS_LABEL[m.status]}
+                </span>
+                {m.hasAudio && (
+                  <span className="audio-dot" title="Amb àudio">
+                    ♪
+                  </span>
+                )}
               </span>
             </div>
             <button

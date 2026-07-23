@@ -1,91 +1,78 @@
-import type { Acta, Utterance, Meeting, MeetingSummary } from "./types";
+import type { Meeting, MeetingSummary } from "./types";
 
-function fileExtension(mimeType: string): string {
-  if (mimeType.includes("mp4")) return "mp4";
-  if (mimeType.includes("mpeg")) return "mp3";
-  if (mimeType.includes("ogg")) return "ogg";
-  if (mimeType.includes("wav")) return "wav";
-  return "webm";
+async function jsonOrThrow<T>(res: Response, fallback: string): Promise<T> {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? fallback);
+  return data as T;
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** Puja l'àudio, encua la transcripció i fa polling fins que està llesta. */
-export async function transcribeAudio(
+/** Pas 1: puja l'àudio gravat (cos binari cru) i el desa com a nova reunió. */
+export async function saveAudioMeeting(
   blob: Blob,
-  speakers?: number
-): Promise<{
-  transcript: string;
-  utterances: Utterance[];
-  audioToken: string | null;
-}> {
-  const form = new FormData();
-  form.append("audio", blob, `reunio.${fileExtension(blob.type)}`);
-  if (speakers && speakers >= 2) form.append("speakers", String(speakers));
-
-  const startRes = await fetch("/api/transcribe", {
+  speakers?: number,
+  durationSec?: number
+): Promise<Meeting> {
+  const params = new URLSearchParams();
+  if (speakers && speakers >= 2) params.set("speakers", String(speakers));
+  if (durationSec && durationSec > 0)
+    params.set("duration", String(durationSec));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const res = await fetch(`/api/meetings${query}`, {
     method: "POST",
-    body: form,
+    headers: { "Content-Type": blob.type || "application/octet-stream" },
+    body: blob,
   });
-  const startData = await startRes.json();
-  if (!startRes.ok) throw new Error(startData.error ?? "Error en la transcripció");
-
-  const id: string = startData.id;
-  const audioToken: string | null = startData.audioToken ?? null;
-  const deadline = Date.now() + 35 * 60 * 1000; // 35 min de marge
-
-  while (Date.now() < deadline) {
-    await sleep(4000);
-    const res = await fetch(`/api/transcribe/status?id=${id}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Error consultant la transcripció");
-    if (data.status === "completed") {
-      return {
-        transcript: data.text,
-        utterances: data.utterances ?? [],
-        audioToken,
-      };
-    }
-    if (data.status === "error") {
-      throw new Error(data.error ?? "La transcripció ha fallat");
-    }
-  }
-  throw new Error("La transcripció ha excedit el temps màxim d'espera");
+  const data = await jsonOrThrow<{ meeting: Meeting }>(
+    res,
+    "No s'ha pogut desar l'àudio"
+  );
+  return data.meeting;
 }
 
-/** Genera l'acta i la desa a l'històric; retorna l'acta i l'id guardat. */
-export async function generateActa(
-  utterances: Utterance[],
-  audioToken?: string | null
-): Promise<{ acta: Acta; id: string | null }> {
-  const res = await fetch("/api/acta", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ utterances, audioToken }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error generant l'acta");
-  return { acta: data.acta as Acta, id: (data.id as string) ?? null };
+/** Pas 2 (inici): encua la transcripció. */
+export async function startTranscription(id: string): Promise<Meeting> {
+  const res = await fetch(`/api/meetings/${id}/transcribe`, { method: "POST" });
+  const data = await jsonOrThrow<{ meeting: Meeting }>(
+    res,
+    "No s'ha pogut iniciar la transcripció"
+  );
+  return data.meeting;
+}
+
+/** Pas 2 (comprovació): consulta l'estat i, si està llest, desa la transcripció. */
+export async function checkTranscription(
+  id: string
+): Promise<{ status: string; meeting: Meeting; error?: string }> {
+  const res = await fetch(`/api/meetings/${id}/transcribe`);
+  return jsonOrThrow(res, "No s'ha pogut consultar la transcripció");
+}
+
+/** Pas 3: genera l'acta a partir de la transcripció. */
+export async function generateActa(id: string): Promise<Meeting> {
+  const res = await fetch(`/api/meetings/${id}/acta`, { method: "POST" });
+  const data = await jsonOrThrow<{ meeting: Meeting }>(
+    res,
+    "No s'ha pogut generar l'acta"
+  );
+  return data.meeting;
 }
 
 export async function listMeetings(): Promise<MeetingSummary[]> {
   const res = await fetch("/api/meetings");
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error carregant l'històric");
-  return data.meetings as MeetingSummary[];
+  const data = await jsonOrThrow<{ meetings: MeetingSummary[] }>(
+    res,
+    "Error carregant l'històric"
+  );
+  return data.meetings;
 }
 
 export async function getMeeting(id: string): Promise<Meeting> {
   const res = await fetch(`/api/meetings/${id}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Reunió no trobada");
-  return data.meeting as Meeting;
+  const data = await jsonOrThrow<{ meeting: Meeting }>(res, "Reunió no trobada");
+  return data.meeting;
 }
 
 export async function deleteMeeting(id: string): Promise<void> {
   const res = await fetch(`/api/meetings/${id}`, { method: "DELETE" });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? "No s'ha pogut esborrar");
-  }
+  await jsonOrThrow(res, "No s'ha pogut esborrar");
 }

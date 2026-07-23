@@ -18,12 +18,12 @@ function headers(json = false): HeadersInit {
   return h;
 }
 
-/** Puja l'àudio i retorna la URL temporal d'AssemblyAI. */
-async function uploadAudio(file: File): Promise<string> {
+/** Puja bytes d'àudio i retorna la URL temporal d'AssemblyAI. */
+async function uploadBytes(bytes: ArrayBuffer | Uint8Array): Promise<string> {
   const res = await fetch(`${BASE}/v2/upload`, {
     method: "POST",
     headers: headers(),
-    body: await file.arrayBuffer(),
+    body: bytes as BodyInit,
   });
   if (!res.ok) throw new Error(`Error pujant l'àudio (${res.status})`);
   const data = (await res.json()) as { upload_url: string };
@@ -69,12 +69,12 @@ export interface TranscriptionStatus {
   error?: string;
 }
 
-/** Puja l'àudio i encua la transcripció; retorna l'id de la feina. */
-export async function startTranscription(
-  file: File,
+/** Puja bytes d'àudio i encua la transcripció; retorna l'id de la feina. */
+export async function startTranscriptionFromBytes(
+  bytes: Buffer,
   speakersExpected?: number
 ): Promise<string> {
-  const audioUrl = await uploadAudio(file);
+  const audioUrl = await uploadBytes(bytes);
   return createTranscript(audioUrl, speakersExpected);
 }
 
@@ -99,14 +99,22 @@ export async function getTranscriptionStatus(
   };
 }
 
+export interface LlmResult {
+  text: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 /**
  * Genera text a partir d'un prompt i un text d'entrada amb l'LLM Gateway
- * d'AssemblyAI (compatible amb OpenAI, mateixa clau d'API).
+ * d'AssemblyAI (compatible amb OpenAI, mateixa clau d'API). Retorna també l'ús
+ * de tokens per calcular el cost.
  */
 export async function generateWithLLM(
   inputText: string,
   prompt: string
-): Promise<string> {
+): Promise<LlmResult> {
   const res = await fetch(LLM_GATEWAY, {
     method: "POST",
     headers: headers(true),
@@ -125,6 +133,12 @@ export async function generateWithLLM(
   }
   const data = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
-  return data.choices?.[0]?.message?.content ?? "";
+  return {
+    text: data.choices?.[0]?.message?.content ?? "",
+    model: LLM_MODEL,
+    inputTokens: data.usage?.prompt_tokens ?? 0,
+    outputTokens: data.usage?.completion_tokens ?? 0,
+  };
 }

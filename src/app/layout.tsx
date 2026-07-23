@@ -20,7 +20,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ca">
-      <body>{children}</body>
+      <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}",
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

@@ -10,8 +10,29 @@
   --accent-2: #9a6bff;
   --rec: #ff5470;
   --ok: #45e0a8;
+  --warn-bg: rgba(255, 193, 94, 0.12);
+  --warn-border: rgba(255, 193, 94, 0.4);
+  --warn-text: #ffdca6;
   --radius: 18px;
   --shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="light"] {
+  --bg: #f3f5fb;
+  --bg-soft: #e7ecf7;
+  --surface: rgba(20, 30, 60, 0.03);
+  --surface-strong: rgba(20, 30, 60, 0.06);
+  --border: rgba(20, 30, 60, 0.14);
+  --text: #1a2138;
+  --muted: #5c6580;
+  --accent: #4560e0;
+  --accent-2: #8148e6;
+  --rec: #e0334f;
+  --ok: #17a884;
+  --warn-bg: rgba(190, 130, 20, 0.12);
+  --warn-border: rgba(190, 130, 20, 0.35);
+  --warn-text: #7a5300;
+  --shadow: 0 20px 45px -22px rgba(30, 40, 80, 0.35);
 }
 
 * {
@@ -192,6 +213,58 @@ button {
 .icon-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: var(--text);
+}
+
+.meeting-cost {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.meeting-cost strong {
+  color: var(--text);
+}
+
+.cost-breakdown {
+  color: var(--muted);
+}
+
+/* Accions de pas (transcriure / generar acta) */
+.step-action {
+  margin: 8px 0 4px;
+}
+
+.step-action .btn.primary {
+  width: 100%;
+}
+
+.step-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+
+/* Pastilla d'estat a l'històric */
+.status-pill {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(154, 166, 199, 0.16);
+  color: var(--muted);
+}
+
+.status-pill.status-transcribing {
+  background: rgba(109, 139, 255, 0.18);
+  color: #c3d0ff;
+}
+
+.status-pill.status-done {
+  background: rgba(69, 224, 168, 0.16);
+  color: #b6f4dd;
 }
 
 /* Blocs plegables dins d'una caixa */
@@ -628,6 +701,7 @@ button {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 9px 15px;
   border-radius: 11px;
@@ -637,7 +711,34 @@ button {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
   transition: background 0.15s ease, transform 0.1s ease;
+}
+
+/* Botons d'acció d'igual mida (Àudio, Exportar…) */
+.btn-action {
+  min-width: 150px;
+}
+
+.processing-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-text);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* Botó de tema clar/fosc */
+.theme-toggle {
+  padding: 0;
+  width: 38px;
+  height: 38px;
 }
 
 .btn:hover {

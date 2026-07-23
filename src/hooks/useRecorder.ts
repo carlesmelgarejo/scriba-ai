@@ -10,25 +10,10 @@ interface UseRecorder {
   stop: () => Promise<Blob | null>;
 }
 
-interface WakeLockSentinelLike {
-  release: () => Promise<void>;
-}
-
-/** Manté la pantalla encesa mentre es grava (iOS Safari 16.4+, Chrome…). */
-async function requestWakeLock(): Promise<WakeLockSentinelLike | null> {
-  try {
-    const nav = navigator as Navigator & {
-      wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinelLike> };
-    };
-    return nav.wakeLock ? await nav.wakeLock.request("screen") : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Encapsula la captura de micròfon amb MediaRecorder.
  * `start` demana permís i comença a gravar; `stop` retorna el Blob resultant.
+ * El Wake Lock es gestiona fora (a la pàgina) per cobrir també el desat.
  */
 export function useRecorder(): UseRecorder {
   const [state, setState] = useState<RecorderState>("idle");
@@ -38,7 +23,6 @@ export function useRecorder(): UseRecorder {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const wakeLockRef = useRef<WakeLockSentinelLike | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -49,11 +33,6 @@ export function useRecorder(): UseRecorder {
 
   const stopTracks = useCallback(() => {
     recorderRef.current?.stream.getTracks().forEach((t) => t.stop());
-  }, []);
-
-  const releaseWakeLock = useCallback(async () => {
-    await wakeLockRef.current?.release().catch(() => {});
-    wakeLockRef.current = null;
   }, []);
 
   const start = useCallback(async () => {
@@ -69,8 +48,6 @@ export function useRecorder(): UseRecorder {
 
       recorder.start();
       recorderRef.current = recorder;
-
-      wakeLockRef.current = await requestWakeLock();
 
       setSeconds(0);
       timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -98,33 +75,19 @@ export function useRecorder(): UseRecorder {
           type: recorder.mimeType || "audio/webm",
         });
         stopTracks();
-        void releaseWakeLock();
         setState("idle");
         resolve(blob);
       };
       recorder.stop();
     });
-  }, [clearTimer, stopTracks, releaseWakeLock]);
-
-  // iOS/Chrome alliberen el wake lock quan s'amaga la pàgina: el reincorporem.
-  useEffect(() => {
-    if (state !== "recording") return;
-    const onVisible = async () => {
-      if (document.visibilityState === "visible" && !wakeLockRef.current) {
-        wakeLockRef.current = await requestWakeLock();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [state]);
+  }, [clearTimer, stopTracks]);
 
   useEffect(() => {
     return () => {
       clearTimer();
       stopTracks();
-      void releaseWakeLock();
     };
-  }, [clearTimer, stopTracks, releaseWakeLock]);
+  }, [clearTimer, stopTracks]);
 
   return { state, seconds, error, start, stop };
 }
