@@ -290,9 +290,8 @@ button {
   margin-bottom: 18px;
 }
 
-/* Mateixa alçada per al reproductor i el botó d'àudio */
-.audio-block .player,
-.audio-block .btn {
+/* Mateixa alçada per al reproductor i els botons d'acció */
+.audio-block .player {
   height: 44px;
 }
 
@@ -787,6 +786,7 @@ button {
 /* Botons d'acció d'igual mida (Àudio, Exportar…) */
 .btn-action {
   min-width: 150px;
+  height: 44px;
 }
 
 .processing-warning {
