@@ -291,7 +291,7 @@ button {
 }
 
 .audio-block .player {
-  height: 44px;
+  height: 62px;
 }
 
 /* Reproductor propi (fons amb el to del logo) */
@@ -329,7 +329,7 @@ button {
 .player-wave {
   flex: 1;
   min-width: 0;
-  height: 32px;
+  height: 50px;
   display: block;
   cursor: pointer;
 }

@@ -40,7 +40,7 @@ function formatDateTime(iso: string): string {
 
 function DownloadIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M7 18.5a4.2 4.2 0 0 1-.8-8.32 5.2 5.2 0 0 1 10.1-1.03A3.8 3.8 0 0 1 16.8 18.5"
         stroke="currentColor"
