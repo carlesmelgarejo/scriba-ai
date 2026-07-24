@@ -13,7 +13,7 @@ The workflow is split into **three decoupled steps**, each of which is saved on 
 2. **Transcribe.** Press the button → AssemblyAI transcribes with `speaker_labels` (diarization) and the per-speaker transcript is saved. This step is **resumable**: if you close the app while it runs, reopening the meeting picks the result up once AssemblyAI finishes.
 3. **Generate minutes.** Press the button → the **LLM Gateway** drafts detailed minutes (attributing points, agreements and tasks to speakers) and saves them as Markdown.
 
-Each meeting shows an **audio player**, and its minutes and transcript as collapsible sections with their own **Export** buttons, plus the **approximate processing cost in euros**.
+Each meeting shows a **custom waveform audio player** (click anywhere on the wave to seek), and its minutes and transcript as collapsible sections with their own **download** buttons, plus the **approximate processing cost in euros**.
 
 ## Features
 
@@ -22,10 +22,11 @@ Each meeting shows an **audio player**, and its minutes and transcript as collap
 - **Speaker diarization** with an optional participant-count hint (upper bound).
 - **Detailed minutes** in Catalan that reference the speakers; the LLM is told the diarization may be imperfect and to fix obvious attribution errors from context.
 - **Persistent history** in a left sidebar (most recent first, with a status pill); click any meeting to view its audio, transcript and minutes.
-- **Audio archive** in Opus (mono, 16 kHz, 24 kbps), playable (with seeking) and downloadable.
+- **Audio archive** in Opus (mono, 16 kHz, 24 kbps), played through a **custom canvas waveform player** — the amplitude peaks are precomputed on save and drawn as a bar chart, normalized so the loudest peak fills the full height; click anywhere on the wave to seek (with a range-slider fallback if no peaks). Downloadable from the history.
 - **Approximate cost per meeting** in euros (audio duration × transcription rate + real LLM token usage).
 - **Light / dark theme** toggle (persisted).
-- **Markdown export** for both the minutes and the transcript.
+- **Markdown export** (icon-only download button) for the audio, the minutes and the transcript.
+- **Automatic deployment (CI/CD)**: a GitHub Actions workflow deploys to the server on every push to `main`.
 - **Password login** (bcrypt hash, signed cookie) protecting every page and API route.
 - **Not indexable** by search engines (`noindex`, `robots.txt`, `X-Robots-Tag`).
 
@@ -103,6 +104,7 @@ src/
     SpeakerSelector.tsx     # participant-count hint
     CollapsibleSection.tsx  # expand/collapse wrapper
     ActaView.tsx            # MeetingView: audio, steps, minutes, transcript, cost
+    AudioPlayer.tsx         # custom canvas waveform player (normalized peaks, click-to-seek)
     HistorySidebar.tsx      # left history list with status
     ThemeToggle.tsx  ProcessingWarning.tsx
   hooks/
@@ -111,7 +113,7 @@ src/
   lib/
     assemblyai.ts           # upload, transcription and LLM Gateway
     acta.ts                 # minutes prompt + JSON parsing/repair
-    audio.ts                # ffmpeg → Opus transcode
+    audio.ts                # ffmpeg → Opus transcode + waveform peak extraction
     store.ts                # persistent history (JSON + Markdown + Opus)
     pricing.ts              # per-meeting cost estimate (EUR)
     auth.ts                 # signed session cookie (HMAC)
@@ -122,6 +124,18 @@ src/
 ## Deploying to a server (Node, e.g. CloudPanel)
 
 The app is meant to run on a **long-running Node server** (not serverless). Each step is its own request: saving the audio, starting the transcription (returns quickly with a job id), polling `/api/meetings/[id]/transcribe` until AssemblyAI finishes, and generating the minutes. The audio is uploaded as a **raw binary body** (not multipart) to be robust with long recordings.
+
+### Automatic deployment (GitHub Actions)
+
+The repo ships a workflow at `.github/workflows/deploy.yml` that, on every push to `main` (or run manually via *Actions → Run workflow*), connects to the server over SSH and runs `deploy.sh`:
+
+```yaml
+git fetch --all
+git reset --hard origin/main
+bash deploy.sh
+```
+
+For this to work the server directory must be a **git checkout** of the repo (not files uploaded by SFTP), keeping `.env.local` and `data/` — both git-ignored — so config and history survive every deploy. Configure these **repository secrets** (Settings → Secrets and variables → Actions): `SSH_HOST` (server IP or bare domain, no `https://`), `SSH_USER`, `SSH_PORT`, `SSH_KEY` (a dedicated deploy private key whose public part is in the server's `~/.ssh/authorized_keys`) and `PROJECT_DIR`. The workflow itself contains **no secrets**, so it's safe in a public repo. See `DEPLOY.md` for the full step-by-step.
 
 ### Compact build (standalone output + PM2)
 
