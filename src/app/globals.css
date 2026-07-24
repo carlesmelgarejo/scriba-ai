@@ -285,12 +285,11 @@ button {
 /* Reproductor d'àudio */
 .audio-block {
   display: flex;
-  align-items: stretch;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 28px;
 }
 
-/* Mateixa alçada per al reproductor i els botons d'acció */
 .audio-block .player {
   height: 44px;
 }
@@ -325,6 +324,14 @@ button {
   color: var(--text);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+}
+
+.player-wave {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  display: block;
+  cursor: pointer;
 }
 
 .player-range {
@@ -787,6 +794,25 @@ button {
 .btn-action {
   min-width: 150px;
   height: 44px;
+}
+
+/* Icona de descàrrega (núvol) sense forma de botó */
+.icon-download {
+  display: inline-grid;
+  place-items: center;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--muted);
+  border-radius: 8px;
+  transition: color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.icon-download:hover {
+  color: var(--accent);
+  background: var(--surface-strong);
 }
 
 .processing-warning {

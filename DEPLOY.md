@@ -3,6 +3,45 @@
 Guia consolidada (amb totes les correccions apreses). Exemple per al site
 `scribaai.elclic.net` amb usuari del site `scribaai`.
 
+## Desplegament automàtic (GitHub Actions)
+
+Amb `.github/workflows/deploy.yml`, cada `push` a `main` entra al servidor per SSH
+i executa `deploy.sh`. Configuració (un sol cop):
+
+1. **El servidor ha de ser un clon de git** (no fitxers per SFTP). Al directori del
+   site, conservant `.env.local` i `data/` (que estan al `.gitignore`):
+
+   ```bash
+   cd ~/htdocs/scribaai.elclic.net
+   git init
+   git remote add origin <URL_DEL_REPO>
+   git fetch origin
+   git reset --hard origin/main
+   ```
+
+2. **Clau SSH de desplegament.** Genera un parell de claus dedicat:
+
+   ```bash
+   ssh-keygen -t ed25519 -f ~/deploy_key -N ""
+   cat ~/deploy_key.pub >> ~/.ssh/authorized_keys   # com a usuari scribaai
+   chmod 600 ~/.ssh/authorized_keys
+   cat ~/deploy_key                                 # la privada → secret de GitHub
+   ```
+
+3. **Secrets del repo** (GitHub → Settings → Secrets and variables → Actions):
+   - `SSH_HOST`: IP o domini del servidor
+   - `SSH_USER`: `scribaai`
+   - `SSH_PORT`: `22` (o el teu port SSH)
+   - `SSH_KEY`: el contingut de la clau **privada** (`~/deploy_key`)
+   - `PROJECT_DIR`: `/home/scribaai/htdocs/scribaai.elclic.net`
+
+A partir d'aquí, cada `git push` a `main` desplega sol. També es pot llançar a mà
+des de la pestanya **Actions** (workflow_dispatch).
+
+> `deploy.sh` fa `git reset --hard` no; el workflow sí. Els fitxers ignorats
+> (`.env.local`, `data/`, `node_modules`, `.next`) no es toquen, així que la config
+> i l'històric es conserven entre desplegaments.
+
 ## 0. A CloudPanel (abans de l'SSH)
 
 1. **Add Site → Create a Node.js Site.** Domini `scribaai.elclic.net`, versió

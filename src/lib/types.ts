@@ -54,6 +54,7 @@ export interface Meeting {
   transcriptId?: string; // id de la feina d'AssemblyAI durant la transcripció
   speakers?: number; // pista de participants triada en gravar
   durationSec?: number; // durada de l'àudio gravat (per calcular el cost)
+  peaks?: number[]; // forma d'ona (envelope) per al reproductor
   llm?: LlmUsage; // ús de l'LLM en generar l'acta (per calcular el cost)
   utterances: Utterance[]; // buit fins que es transcriu
   acta: Acta | null; // null fins que es genera

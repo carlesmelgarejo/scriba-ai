@@ -5,6 +5,12 @@ export const metadata: Metadata = {
   title: "ScribaAI · Transcripció i actes de reunió amb IA",
   description:
     "Grava la reunió, transcriu-la i genera l'acta estructurada automàticament.",
+  applicationName: "ScribaAI",
+  appleWebApp: {
+    capable: true,
+    title: "ScribaAI",
+    statusBarStyle: "black-translucent",
+  },
   robots: {
     index: false,
     follow: false,

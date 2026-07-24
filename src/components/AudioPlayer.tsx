@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 function fmt(s: number): string {
   if (!Number.isFinite(s)) return "0:00";
@@ -11,14 +11,23 @@ function fmt(s: number): string {
   return `${m}:${sec}`;
 }
 
-export function AudioPlayer({ src }: { src: string }) {
-  const ref = useRef<HTMLAudioElement>(null);
+export function AudioPlayer({
+  src,
+  peaks,
+}: {
+  src: string;
+  peaks?: number[];
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playing, setPlaying] = useState(false);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
 
+  const hasWave = !!peaks && peaks.length > 0;
+
   useEffect(() => {
-    const a = ref.current;
+    const a = audioRef.current;
     if (!a) return;
     const onTime = () => setCur(a.currentTime);
     const onMeta = () => setDur(a.duration || 0);
@@ -33,8 +42,54 @@ export function AudioPlayer({ src }: { src: string }) {
     };
   }, []);
 
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !peaks || !peaks.length) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const styles = getComputedStyle(document.documentElement);
+    const accent = styles.getPropertyValue("--accent").trim() || "#6d8bff";
+    const muted = styles.getPropertyValue("--muted").trim() || "#9aa6c7";
+
+    const ratio = dur > 0 ? cur / dur : 0;
+    const N = peaks.length;
+    const step = w / N;
+    const barW = Math.max(1, step - 1);
+    const mid = h / 2;
+
+    for (let i = 0; i < N; i++) {
+      const barH = Math.max(2, peaks[i] * (h - 2));
+      const played = i / N <= ratio;
+      ctx.globalAlpha = played ? 1 : 0.4;
+      ctx.fillStyle = played ? accent : muted;
+      ctx.fillRect(i * step, mid - barH / 2, barW, barH);
+    }
+    ctx.globalAlpha = 1;
+  }, [peaks, cur, dur]);
+
+  useEffect(() => {
+    draw();
+  }, [draw]);
+
+  useEffect(() => {
+    const onResize = () => draw();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [draw]);
+
   function toggle() {
-    const a = ref.current;
+    const a = audioRef.current;
     if (!a) return;
     if (a.paused) {
       void a.play();
@@ -45,19 +100,17 @@ export function AudioPlayer({ src }: { src: string }) {
     }
   }
 
-  function seek(e: React.ChangeEvent<HTMLInputElement>) {
-    const a = ref.current;
-    if (!a) return;
-    const v = Number(e.target.value);
-    a.currentTime = v;
-    setCur(v);
+  function seekRatio(ratio: number) {
+    const a = audioRef.current;
+    if (!a || !dur) return;
+    const clamped = Math.max(0, Math.min(1, ratio));
+    a.currentTime = clamped * dur;
+    setCur(clamped * dur);
   }
-
-  const pct = dur > 0 ? (cur / dur) * 100 : 0;
 
   return (
     <div className="player">
-      <audio ref={ref} src={src} preload="metadata" />
+      <audio ref={audioRef} src={src} preload="metadata" />
       <button
         type="button"
         className="player-btn"
@@ -75,19 +128,35 @@ export function AudioPlayer({ src }: { src: string }) {
           </svg>
         )}
       </button>
-      <span className="player-time">{fmt(cur)}</span>
-      <input
-        className="player-range"
-        type="range"
-        min={0}
-        max={dur || 0}
-        step={0.1}
-        value={Math.min(cur, dur || 0)}
-        onChange={seek}
-        style={{ ["--pct"]: `${pct}%` } as React.CSSProperties}
-        aria-label="Posició de l'àudio"
-      />
-      <span className="player-time">{fmt(dur)}</span>
+
+      {hasWave ? (
+        <canvas
+          ref={canvasRef}
+          className="player-wave"
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            seekRatio((e.clientX - rect.left) / rect.width);
+          }}
+        />
+      ) : (
+        <input
+          className="player-range"
+          type="range"
+          min={0}
+          max={dur || 0}
+          step={0.1}
+          value={Math.min(cur, dur || 0)}
+          onChange={(e) => seekRatio(dur ? Number(e.target.value) / dur : 0)}
+          style={
+            { ["--pct"]: `${dur ? (cur / dur) * 100 : 0}%` } as React.CSSProperties
+          }
+          aria-label="Posició de l'àudio"
+        />
+      )}
+
+      <span className="player-time">
+        {fmt(cur)} / {fmt(dur)}
+      </span>
     </div>
   );
 }

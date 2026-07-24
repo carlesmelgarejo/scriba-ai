@@ -3,6 +3,7 @@ import path from "path";
 import type { Acta, Meeting, MeetingSummary, Utterance } from "./types";
 import { meetingStatus } from "./types";
 import { actaToMarkdown } from "./format";
+import { extractPeaks } from "./audio";
 
 // Carpeta persistent de dades. En producció (standalone) cal apuntar-la
 // FORA de .next amb SCRIBA_DATA_DIR perquè no es perdi en cada build.
@@ -33,6 +34,7 @@ function normalize(raw: unknown): Meeting {
     transcriptId: m.transcriptId,
     speakers: m.speakers,
     durationSec: m.durationSec,
+    peaks: m.peaks,
     llm: m.llm,
     utterances: Array.isArray(m.utterances) ? m.utterances : [],
     acta: m.acta ?? null,
@@ -64,8 +66,10 @@ export async function createAudioMeeting(
   await ensureDir();
   const id = newId();
   const hasAudio = opus.length > 0;
+  let peaks: number[] | undefined;
   if (hasAudio) {
     await fs.writeFile(path.join(DATA_DIR, `${id}.opus`), opus);
+    peaks = (await extractPeaks(opus)) ?? undefined;
   }
   const meeting: Meeting = {
     id,
@@ -74,6 +78,7 @@ export async function createAudioMeeting(
     hasAudio,
     speakers,
     durationSec,
+    peaks,
     utterances: [],
     acta: null,
   };

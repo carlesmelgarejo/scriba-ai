@@ -40,7 +40,7 @@ function formatDateTime(iso: string): string {
 
 function DownloadIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M7 18.5a4.2 4.2 0 0 1-.8-8.32 5.2 5.2 0 0 1 10.1-1.03A3.8 3.8 0 0 1 16.8 18.5"
         stroke="currentColor"
@@ -63,13 +63,15 @@ function ExportButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="btn btn-action"
+      className="icon-download"
+      title="Descarrega"
+      aria-label="Descarrega"
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
     >
-      <DownloadIcon /> Descarrega
+      <DownloadIcon />
     </button>
   );
 }
@@ -189,13 +191,15 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
 
       {audioUrl && (
         <div className="audio-block">
-          <AudioPlayer src={audioUrl} />
+          <AudioPlayer src={audioUrl} peaks={meeting.peaks} />
           <a
-            className="btn btn-action"
+            className="icon-download"
             href={audioUrl}
             download={`audio-${slug}.opus`}
+            title="Descarrega"
+            aria-label="Descarrega"
           >
-            <DownloadIcon /> Descarrega
+            <DownloadIcon />
           </a>
         </div>
       )}

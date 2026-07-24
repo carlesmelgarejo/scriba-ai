@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMeeting, deleteMeeting } from "@/lib/store";
+import {
+  getMeeting,
+  deleteMeeting,
+  updateMeeting,
+  readMeetingAudio,
+} from "@/lib/store";
+import { extractPeaks } from "@/lib/audio";
 
 export const runtime = "nodejs";
 
@@ -8,10 +14,24 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const meeting = await getMeeting(id);
+  let meeting = await getMeeting(id);
   if (!meeting) {
     return NextResponse.json({ error: "Reunió no trobada" }, { status: 404 });
   }
+
+  // Backfill: si té àudio però no forma d'ona (reunions anteriors), la calcula i la desa.
+  if (meeting.hasAudio && (!meeting.peaks || meeting.peaks.length === 0)) {
+    try {
+      const audio = await readMeetingAudio(id);
+      if (audio) {
+        const peaks = await extractPeaks(audio);
+        if (peaks) meeting = (await updateMeeting(id, { peaks })) ?? meeting;
+      }
+    } catch {
+      // si falla, es continua sense forma d'ona
+    }
+  }
+
   return NextResponse.json({ meeting });
 }
 
