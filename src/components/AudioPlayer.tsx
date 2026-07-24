@@ -67,9 +67,10 @@ export function AudioPlayer({
     const step = w / N;
     const barW = Math.max(1, step - 1);
     const mid = h / 2;
+    const maxPeak = peaks.reduce((m, p) => (p > m ? p : m), 0) || 1;
 
     for (let i = 0; i < N; i++) {
-      const barH = Math.max(2, peaks[i] * (h - 2));
+      const barH = Math.max(2, (peaks[i] / maxPeak) * h);
       const played = i / N <= ratio;
       ctx.globalAlpha = played ? 1 : 0.4;
       ctx.fillStyle = played ? accent : muted;
