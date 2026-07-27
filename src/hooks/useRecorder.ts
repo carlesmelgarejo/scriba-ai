@@ -39,7 +39,10 @@ export function useRecorder(): UseRecorder {
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      // 48 kbps: prou per a veu i manté els fitxers petits (m4a de l'iPhone,
+      // webm de Chrome) per no topar amb el límit de pujada. El servidor ho
+      // reconverteix a Opus igualment.
+      const recorder = new MediaRecorder(stream, { audioBitsPerSecond: 48000 });
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {

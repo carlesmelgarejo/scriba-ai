@@ -285,6 +285,17 @@ export default function Home() {
                 onToggle={handleToggle}
               />
 
+              <div className="status">
+                {busy ? (
+                  <span className="busy">
+                    <span className="spinner" />
+                    {STATUS_TEXT[phase]}
+                  </span>
+                ) : (
+                  recorder.error ?? STATUS_TEXT[phase]
+                )}
+              </div>
+
               {recorder.state !== "recording" && !busy && (
                 <label className="btn ghost import-btn">
                   Importar àudio
@@ -296,17 +307,6 @@ export default function Home() {
                   />
                 </label>
               )}
-
-              <div className="status">
-                {busy ? (
-                  <span className="busy">
-                    <span className="spinner" />
-                    {STATUS_TEXT[phase]}
-                  </span>
-                ) : (
-                  recorder.error ?? STATUS_TEXT[phase]
-                )}
-              </div>
 
               {(recorder.state === "recording" || busy) && <ProcessingWarning />}
 

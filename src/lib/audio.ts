@@ -3,7 +3,7 @@ import { spawn } from "child_process";
 const FFMPEG = process.env.FFMPEG_PATH ?? "ffmpeg";
 
 /**
- * Transcodifica qualsevol àudio (webm/opus, mp4/aac...) a Opus mono 16 kHz 24 kbps
+ * Transcodifica qualsevol àudio (webm/opus, mp4/aac...) a Opus mono 16 kHz 32 kbps
  * (contenidor Ogg) fent servir ffmpeg del sistema. Retorna null si ffmpeg no està
  * disponible o falla; el route de desat ho tracta com a error (l'àudio SEMPRE es
  * desa en Opus) perquè el client pugui reintentar.
@@ -17,7 +17,7 @@ export function transcodeToOpus(input: Buffer): Promise<Buffer | null> {
       "-ac", "1", // mono
       "-ar", "16000", // 16 kHz
       "-c:a", "libopus",
-      "-b:a", "24k", // 24 kbps
+      "-b:a", "32k", // 32 kbps
       "-application", "voip", // optimitzat per veu
       "-f", "ogg",
       "pipe:1",
