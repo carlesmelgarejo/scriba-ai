@@ -459,6 +459,13 @@ button {
   cursor: not-allowed;
 }
 
+/* Hover propi (més específic que .btn:hover) perquè no perdi el degradat i
+   s'enfosqueixi de debò; si no, en mode clar el blanc translúcid es confon amb el fons. */
+.btn.primary:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  filter: brightness(0.9);
+}
+
 .logo {
   width: 44px;
   height: 44px;
