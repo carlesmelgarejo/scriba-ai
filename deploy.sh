@@ -31,6 +31,13 @@ else
   echo "⚠ No s'ha trobat .env.local — recorda crear-lo dins de .next/standalone/"
 fi
 
+# Assegura la carpeta de dades (històric). La crea l'usuari que executa
+# deploy.sh, així queda amb el propietari correcte i no cal cap chown/sudo.
+DATA_DIR="$(grep -E '^SCRIBA_DATA_DIR=' .env.local 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"' | xargs || true)"
+DATA_DIR="${DATA_DIR:-$PWD/data}"
+echo "▸ Assegurant la carpeta de dades: $DATA_DIR"
+mkdir -p "$DATA_DIR"
+
 echo "▸ (Re)arrencant amb PM2…"
 pm2 startOrReload ecosystem.config.js
 pm2 save

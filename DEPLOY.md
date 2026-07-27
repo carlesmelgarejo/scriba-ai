@@ -88,17 +88,24 @@ Contingut (el hash va en **base64** per evitar que Next interpreti els `$`):
 ```
 ASSEMBLYAI_API_KEY=la_teva_clau
 ASSEMBLYAI_LANGUAGE=ca
-ASSEMBLYAI_LLM_MODEL=qwen3-32B
+ASSEMBLYAI_LLM_MODEL=claude-haiku-4-5-20251001
 AUTH_PASSWORD_HASH_B64=el_hash_en_base64
 AUTH_SECRET=els_64_hex
-SCRIBA_DATA_DIR=/home/scribaai/htdocs/scribaai.elclic.net/data
+SCRIBA_DATA_DIR=/home/scribaai/scriba-data
 ```
 
 > **Històric (dades persistents):** `SCRIBA_DATA_DIR` ha d'apuntar a una carpeta
-> FORA de `.next` (com la d'aquí, a l'arrel del site). Així les reunions desades
-> (JSON + Markdown + àudio Opus) sobreviuen a cada `deploy.sh`, que reconstrueix
-> `.next`. Si no la poses, es desarien dins de `.next/standalone/data` i es perdrien
-> en redesplegar.
+> **fora del repo/checkout git** i fora de `.next`. Recomanat: `~/scriba-data`
+> (`/home/scribaai/scriba-data`). Així les reunions (JSON + Markdown + àudio Opus)
+> sobreviuen a cada `deploy.sh` (que reconstrueix `.next`) **i** a qualsevol
+> `git reset --hard` o re-clonat, que mai toquen res de fora del directori del site.
+> Si la poses dins del site (p. ex. `.../scribaai.elclic.net/data`) segueix
+> funcionant, però hauràs de moure-la a mà cada cop que buidis la carpeta per
+> re-clonar.
+
+> **La crea `deploy.sh` sol:** el script llegeix `SCRIBA_DATA_DIR` del `.env.local`
+> i fa `mkdir -p`. Com que el desplegament corre com a `scribaai`, la carpeta queda
+> **amb el propietari correcte** i no cal cap `chown` ni `sudo`.
 
 > **Àudio (ffmpeg):** per desar l'àudio de cada reunió en Opus cal `ffmpeg` al
 > servidor: `sudo apt install ffmpeg` (un cop, com a root/admin). Si no hi és,
@@ -124,8 +131,9 @@ pm2 status              # 'scribaai'/'actaai' en verd
 ```
 
 El `deploy.sh` fa: `npm install` → build → copia `.next/static` i `.env.local`
-dins de `.next/standalone` → arrenca amb PM2 → esborra `node_modules` (el build ja
-no cal; la app corre des del standalone, ~30 MB).
+dins de `.next/standalone` → **crea `SCRIBA_DATA_DIR` si no existeix** (amb el
+propietari correcte, ja que corre com `scribaai`) → arrenca amb PM2 → esborra
+`node_modules` (el build ja no cal; la app corre des del standalone, ~30 MB).
 
 ## 5. Ajusta l'nginx del site
 
@@ -173,6 +181,17 @@ bash deploy.sh
 - **`permission denied` a `./deploy.sh`** → `bash deploy.sh` o `chmod +x deploy.sh`.
 - **Login sempre incorrecte** → el hash ha d'anar en **base64** a
   `AUTH_PASSWORD_HASH_B64`, no el bcrypt cru (els `$` es corrompen al `.env`).
+- **`EACCES: permission denied` en desar l'àudio/reunió** → la carpeta de
+  `SCRIBA_DATA_DIR` (o algun fitxer) és d'un altre usuari (típicament `root`, si
+  alguna cosa es va executar amb `sudo`). Comprova-ho amb
+  `stat -c '%U:%G %a' <SCRIBA_DATA_DIR>`; ha de ser `scribaai:scribaai`. Solució
+  neta: posa `SCRIBA_DATA_DIR` **fora del site** (`~/scriba-data`) i deixa que
+  `deploy.sh` la creï. Si ja té fitxers de root: copia'ls com a `scribaai`
+  (`cp -r`, tenen lectura per a tothom) o fes el `chown` **com a root**.
+- **`sudo` demana contrasenya i no l'accepta** → l'usuari del site de CloudPanel
+  (`scribaai`) **no és sudoer** (i sovint no té contrasenya; entres per clau SSH).
+  No facis servir `sudo` amb aquest usuari: treballa dins de la seva carpeta sense
+  `sudo`, o entra com a **root** per a operacions que el necessitin.
 - **`npm -g` dona `EACCES`** → amb nvm actiu no cal root; si no uses nvm, posa
   `npm config set prefix ~/.npm-global` i afegeix `~/.npm-global/bin` al PATH.
 - **`EADDRINUSE: address already in use :::3000`** → un altre site ja té aquell
