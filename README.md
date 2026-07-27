@@ -20,6 +20,7 @@ Each meeting shows a **custom waveform audio player** (click anywhere on the wav
 - **Three-step, decoupled flow** (audio → transcript → minutes), each persisted immediately; safe to pause between steps.
 - **Single-button recording** with a live timer, a max-duration cap and a **Wake Lock** to keep the screen awake during any processing.
 - **Retry on failed save**: if storing the audio fails (e.g. a server error), the recording is kept in memory and you can **Retry** the upload without re-recording, or **Download a local copy** of the raw audio as a safety net.
+- **Import an audio file** (up to 180 min) to process it through the same pipeline — useful to recover a downloaded backup copy. Any input format the server's ffmpeg can read is accepted; it is **always transcoded to Opus** on upload (the save fails rather than storing a non-Opus file).
 - **Speaker diarization** with an optional participant-count hint (upper bound).
 - **Detailed minutes** in Catalan that reference the speakers; the LLM is told the diarization may be imperfect and to fix obvious attribution errors from context.
 - **Persistent history** in a left sidebar (most recent first, with a status pill); click any meeting to view its audio, transcript and minutes.
@@ -174,7 +175,7 @@ Things to configure:
 
 ## Notes and limits
 
-- **Audio archive:** each meeting's audio is transcoded to **Opus (mono, 16 kHz, 24 kbps)** and stored next to the minutes, playable/downloadable from the history. Requires **`ffmpeg`** on the server (`apt install ffmpeg`); if it's missing, the app still works but skips saving audio.
+- **Audio archive:** each meeting's audio is **always transcoded to Opus (mono, 16 kHz, 24 kbps)** and stored next to the minutes, playable/downloadable from the history. This requires **`ffmpeg`** on the server (`apt install ffmpeg`): the save endpoint transcodes on upload and, if ffmpeg is missing or the transcode fails, returns an error instead of storing a non-Opus file (the client can then retry). The local download used as a backup is the browser's native recording (webm or m4a/mp4), which the **Import** button re-transcodes to Opus.
 - **History persistence:** meetings are stored on disk under `SCRIBA_DATA_DIR`. In production (standalone build) point it **outside `.next`** or the history is wiped on every deploy. See `DEPLOY.md`.
 - **Diarization** returns generic labels (`Speaker A`, `B`…). If someone says their name during the meeting, the LLM tries to map it to the real name. The participant selector is an **upper bound**, not an exact count — audio quality (mic distance, cross-talk) is the main driver of accuracy.
 - Recording stops automatically when the chosen maximum duration is reached.

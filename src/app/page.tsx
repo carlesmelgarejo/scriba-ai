@@ -21,6 +21,42 @@ const STATUS_TEXT: Record<Phase, string> = {
   saving: "Desant l'àudio…",
 };
 
+const MAX_IMPORT_SECONDS = 180 * 60;
+
+/** Llegeix la durada d'un fitxer d'àudio al navegador. Retorna 0 si no es pot
+ *  determinar. Gestiona el cas dels webm de MediaRecorder, que reporten
+ *  `Infinity` fins que es força un seek al final. */
+function readAudioDuration(file: Blob): Promise<number> {
+  return new Promise((resolve) => {
+    const el = document.createElement("audio");
+    const url = URL.createObjectURL(file);
+    const done = (secs: number) => {
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(secs) ? Math.round(secs) : 0);
+    };
+    const timeout = setTimeout(() => done(0), 8000);
+    el.preload = "metadata";
+    el.onerror = () => {
+      clearTimeout(timeout);
+      done(0);
+    };
+    el.onloadedmetadata = () => {
+      if (el.duration === Infinity) {
+        el.ontimeupdate = () => {
+          el.ontimeupdate = null;
+          clearTimeout(timeout);
+          done(el.duration);
+        };
+        el.currentTime = 1e101; // força el càlcul de la durada real
+      } else {
+        clearTimeout(timeout);
+        done(el.duration);
+      }
+    };
+    el.src = url;
+  });
+}
+
 export default function Home() {
   const recorder = useRecorder();
   const wake = useWakeLock();
@@ -95,6 +131,27 @@ export default function Home() {
     await wake.acquire(); // dins del gest de l'usuari (necessari a iOS)
     await doSave(pending);
   }, [pending, wake, doSave]);
+
+  const importAudio = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = ""; // permet reimportar el mateix fitxer
+      if (!file || phase === "saving" || recorder.state === "recording") return;
+      setError(null);
+      setViewing(null);
+      setSelectedId(null);
+      const durationSec = await readAudioDuration(file);
+      if (durationSec > MAX_IMPORT_SECONDS) {
+        setError("L'àudio supera el màxim de 180 minuts.");
+        return;
+      }
+      const item = { blob: file, durationSec, speakers };
+      setPending(item);
+      await wake.acquire();
+      await doSave(item);
+    },
+    [phase, recorder.state, speakers, wake, doSave]
+  );
 
   // Aturada automàtica en arribar al límit de durada seleccionat.
   useEffect(() => {
@@ -227,6 +284,18 @@ export default function Home() {
                 disabled={busy}
                 onToggle={handleToggle}
               />
+
+              {recorder.state !== "recording" && !busy && (
+                <label className="btn ghost import-btn">
+                  Importar àudio
+                  <input
+                    type="file"
+                    accept="audio/*,video/mp4,.webm,.m4a,.mp3,.wav,.opus,.ogg"
+                    hidden
+                    onChange={importAudio}
+                  />
+                </label>
+              )}
 
               <div className="status">
                 {busy ? (

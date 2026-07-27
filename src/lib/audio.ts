@@ -5,7 +5,8 @@ const FFMPEG = process.env.FFMPEG_PATH ?? "ffmpeg";
 /**
  * Transcodifica qualsevol àudio (webm/opus, mp4/aac...) a Opus mono 16 kHz 24 kbps
  * (contenidor Ogg) fent servir ffmpeg del sistema. Retorna null si ffmpeg no està
- * disponible o falla, perquè el desat d'àudio és opcional i no ha de trencar el flux.
+ * disponible o falla; el route de desat ho tracta com a error (l'àudio SEMPRE es
+ * desa en Opus) perquè el client pugui reintentar.
  */
 export function transcodeToOpus(input: Buffer): Promise<Buffer | null> {
   return new Promise((resolve) => {

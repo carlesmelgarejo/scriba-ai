@@ -236,6 +236,13 @@ button {
   margin: 8px 0 4px;
 }
 
+.import-btn {
+  display: flex;
+  width: fit-content;
+  margin: 14px auto 0;
+  cursor: pointer;
+}
+
 .retry-actions {
   display: flex;
   gap: 10px;

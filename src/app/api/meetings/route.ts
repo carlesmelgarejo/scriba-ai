@@ -35,7 +35,19 @@ export async function POST(req: NextRequest) {
     const durationRaw = req.nextUrl.searchParams.get("duration");
     const duration = durationRaw ? parseInt(durationRaw, 10) : NaN;
 
-    const opus = (await transcodeToOpus(bytes)) ?? bytes; // si no hi ha ffmpeg, desa l'original
+    // Transcodificació obligatòria: l'àudio sempre es desa en Opus. Si falla
+    // (p. ex. ffmpeg no disponible o format no vàlid), no desem res i retornem
+    // error, així el client pot reintentar sense perdre l'àudio.
+    const opus = await transcodeToOpus(bytes);
+    if (!opus) {
+      return NextResponse.json(
+        {
+          error:
+            "No s'ha pogut transcodificar l'àudio a Opus. Comprova que ffmpeg estigui instal·lat al servidor i que el fitxer sigui un àudio vàlid.",
+        },
+        { status: 422 }
+      );
+    }
 
     const meeting = await createAudioMeeting(
       opus,
