@@ -31,7 +31,50 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reloadSignal, setReloadSignal] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Àudio gravat pendent de desar: es reté per poder reintentar si el desat falla.
+  const [pending, setPending] = useState<{
+    blob: Blob;
+    durationSec: number;
+    speakers: SpeakerOption;
+  } | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const autoStopped = useRef(false);
+
+  // URL local del blob pendent (per a la descàrrega de seguretat).
+  useEffect(() => {
+    if (!pending) {
+      setPendingUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(pending.blob);
+    setPendingUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pending]);
+
+  const doSave = useCallback(
+    async (item: { blob: Blob; durationSec: number; speakers: SpeakerOption }) => {
+      setError(null);
+      setPhase("saving"); // el Wake Lock segueix actiu durant el desat
+      try {
+        const meeting = await saveAudioMeeting(
+          item.blob,
+          item.speakers,
+          item.durationSec
+        );
+        setPending(null);
+        setViewing(meeting);
+        setSelectedId(meeting.id);
+        setReloadSignal((n) => n + 1);
+      } catch (e) {
+        // No esborrem el pendent: així es pot reintentar sense perdre l'àudio.
+        setError(e instanceof Error ? e.message : "Error desant l'àudio");
+      } finally {
+        setPhase("idle");
+        await wake.release();
+      }
+    },
+    [wake]
+  );
 
   const saveRecording = useCallback(async () => {
     const durationSec = recorder.seconds;
@@ -42,20 +85,16 @@ export default function Home() {
       await wake.release();
       return;
     }
-    try {
-      setPhase("saving"); // el Wake Lock segueix actiu durant el desat
-      const meeting = await saveAudioMeeting(blob, speakers, durationSec);
-      setViewing(meeting);
-      setSelectedId(meeting.id);
-      setReloadSignal((n) => n + 1);
-      setPhase("idle");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error desant l'àudio");
-      setPhase("idle");
-    } finally {
-      await wake.release();
-    }
-  }, [recorder, speakers, wake]);
+    const item = { blob, durationSec, speakers };
+    setPending(item);
+    await doSave(item);
+  }, [recorder, speakers, doSave]);
+
+  const retrySave = useCallback(async () => {
+    if (!pending) return;
+    await wake.acquire(); // dins del gest de l'usuari (necessari a iOS)
+    await doSave(pending);
+  }, [pending, wake, doSave]);
 
   // Aturada automàtica en arribar al límit de durada seleccionat.
   useEffect(() => {
@@ -77,6 +116,7 @@ export default function Home() {
     }
     setViewing(null);
     setSelectedId(null);
+    setPending(null); // descartem qualsevol àudio pendent no desat
     await wake.acquire(); // dins del gest de l'usuari (necessari a iOS)
     await recorder.start();
     setPhase("recording");
@@ -202,6 +242,25 @@ export default function Home() {
               {(recorder.state === "recording" || busy) && <ProcessingWarning />}
 
               {error && <div className="error">{error}</div>}
+
+              {pending && !busy && (
+                <div className="retry-actions">
+                  <button type="button" className="btn primary" onClick={retrySave}>
+                    Reintentar desar
+                  </button>
+                  {pendingUrl && (
+                    <a
+                      className="btn ghost"
+                      href={pendingUrl}
+                      download={`reunio-${pending.durationSec}s.${
+                        pending.blob.type.includes("mp4") ? "m4a" : "webm"
+                      }`}
+                    >
+                      Descarregar còpia
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

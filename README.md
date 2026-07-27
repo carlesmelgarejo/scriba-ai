@@ -19,6 +19,7 @@ Each meeting shows a **custom waveform audio player** (click anywhere on the wav
 
 - **Three-step, decoupled flow** (audio → transcript → minutes), each persisted immediately; safe to pause between steps.
 - **Single-button recording** with a live timer, a max-duration cap and a **Wake Lock** to keep the screen awake during any processing.
+- **Retry on failed save**: if storing the audio fails (e.g. a server error), the recording is kept in memory and you can **Retry** the upload without re-recording, or **Download a local copy** of the raw audio as a safety net.
 - **Speaker diarization** with an optional participant-count hint (upper bound).
 - **Detailed minutes** in Catalan that reference the speakers; the LLM is told the diarization may be imperfect and to fix obvious attribution errors from context.
 - **Persistent history** in a left sidebar (most recent first, with a status pill); click any meeting to view its audio, transcript and minutes.
