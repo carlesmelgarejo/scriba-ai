@@ -14,15 +14,30 @@ function runFfmpeg(args: string[]): Promise<Buffer | null> {
     let proc;
     try {
       proc = spawn(FFMPEG, args);
-    } catch {
+    } catch (e) {
+      console.error("[ffmpeg] spawn ha fallat:", (e as Error).message);
       resolve(null);
       return;
     }
     const chunks: Buffer[] = [];
+    const errChunks: Buffer[] = [];
     proc.stdout.on("data", (d: Buffer) => chunks.push(d));
-    proc.on("error", () => resolve(null)); // ffmpeg no instal·lat
+    proc.stderr.on("data", (d: Buffer) => errChunks.push(d));
+    proc.on("error", (e) => {
+      console.error("[ffmpeg] error de procés:", e.message);
+      resolve(null);
+    });
     proc.on("close", (code) => {
-      resolve(code === 0 && chunks.length ? Buffer.concat(chunks) : null);
+      if (code === 0 && chunks.length) {
+        resolve(Buffer.concat(chunks));
+        return;
+      }
+      console.error(
+        `[ffmpeg] exit=${code} · stderr=${Buffer.concat(errChunks)
+          .toString()
+          .slice(0, 600)}`
+      );
+      resolve(null);
     });
   });
 }
@@ -35,7 +50,8 @@ async function withTempInput<T>(
   const path = join(tmpdir(), `scriba-${randomBytes(8).toString("hex")}`);
   try {
     await writeFile(path, input);
-  } catch {
+  } catch (e) {
+    console.error("[audio] no s'ha pogut escriure el temporal:", (e as Error).message);
     return null;
   }
   try {
