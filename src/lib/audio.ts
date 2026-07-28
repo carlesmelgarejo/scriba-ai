@@ -1,6 +1,49 @@
 import { spawn } from "child_process";
+import { writeFile, unlink } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { randomBytes } from "crypto";
 
 const FFMPEG = process.env.FFMPEG_PATH ?? "ffmpeg";
+
+/** Executa ffmpeg amb els arguments donats i retorna el que escriu a stdout
+ *  (o null si falla). No fem servir stdin: l'entrada va sempre per fitxer,
+ *  perquè amb `pipe:0` ffmpeg no pot cercar i talla mp4/webm i entrades grans. */
+function runFfmpeg(args: string[]): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    let proc;
+    try {
+      proc = spawn(FFMPEG, args);
+    } catch {
+      resolve(null);
+      return;
+    }
+    const chunks: Buffer[] = [];
+    proc.stdout.on("data", (d: Buffer) => chunks.push(d));
+    proc.on("error", () => resolve(null)); // ffmpeg no instal·lat
+    proc.on("close", (code) => {
+      resolve(code === 0 && chunks.length ? Buffer.concat(chunks) : null);
+    });
+  });
+}
+
+/** Escriu l'entrada a un fitxer temporal, executa `fn` amb la ruta i el neteja. */
+async function withTempInput<T>(
+  input: Buffer,
+  fn: (path: string) => Promise<T>
+): Promise<T | null> {
+  const path = join(tmpdir(), `scriba-${randomBytes(8).toString("hex")}`);
+  try {
+    await writeFile(path, input);
+  } catch {
+    return null;
+  }
+  try {
+    return await fn(path);
+  } finally {
+    await unlink(path).catch(() => {});
+  }
+}
 
 /**
  * Transcodifica qualsevol àudio (webm/opus, mp4/aac...) a Opus mono 16 kHz 32 kbps
@@ -9,11 +52,11 @@ const FFMPEG = process.env.FFMPEG_PATH ?? "ffmpeg";
  * desa en Opus) perquè el client pugui reintentar.
  */
 export function transcodeToOpus(input: Buffer): Promise<Buffer | null> {
-  return new Promise((resolve) => {
-    const args = [
+  return withTempInput(input, (path) =>
+    runFfmpeg([
       "-hide_banner",
       "-loglevel", "error",
-      "-i", "pipe:0",
+      "-i", path,
       "-ac", "1", // mono
       "-ar", "16000", // 16 kHz
       "-c:a", "libopus",
@@ -21,28 +64,8 @@ export function transcodeToOpus(input: Buffer): Promise<Buffer | null> {
       "-application", "voip", // optimitzat per veu
       "-f", "ogg",
       "pipe:1",
-    ];
-
-    let proc;
-    try {
-      proc = spawn(FFMPEG, args);
-    } catch {
-      resolve(null);
-      return;
-    }
-
-    const chunks: Buffer[] = [];
-    proc.stdout.on("data", (d: Buffer) => chunks.push(d));
-    proc.on("error", () => resolve(null)); // ffmpeg no instal·lat
-    proc.on("close", (code) => {
-      if (code === 0 && chunks.length) resolve(Buffer.concat(chunks));
-      else resolve(null);
-    });
-
-    proc.stdin.on("error", () => {});
-    proc.stdin.write(input);
-    proc.stdin.end();
-  });
+    ])
+  );
 }
 
 /**
@@ -50,64 +73,40 @@ export function transcodeToOpus(input: Buffer): Promise<Buffer | null> {
  * a PCM mono 1 kHz i agrupa en `numPeaks` valors (màxim per tram, normalitzat 0..1).
  * Es fa al servidor per no haver de descodificar àudios llargs al navegador.
  */
-export function extractPeaks(
+export async function extractPeaks(
   input: Buffer,
   numPeaks = 600
 ): Promise<number[] | null> {
-  return new Promise((resolve) => {
-    const args = [
+  const buf = await withTempInput(input, (path) =>
+    runFfmpeg([
       "-hide_banner",
       "-loglevel", "error",
-      "-i", "pipe:0",
+      "-i", path,
       "-ac", "1",
       "-ar", "1000",
       "-f", "s16le",
       "pipe:1",
-    ];
+    ])
+  );
+  if (!buf) return null;
 
-    let proc;
-    try {
-      proc = spawn(FFMPEG, args);
-    } catch {
-      resolve(null);
-      return;
+  const usable = buf.byteLength - (buf.byteLength % 2);
+  if (usable <= 0) return null;
+  const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + usable);
+  const samples = new Int16Array(ab);
+  const L = samples.length;
+  const P = Math.min(numPeaks, L);
+  const bucket = Math.floor(L / P) || 1;
+  const peaks: number[] = [];
+  for (let i = 0; i < P; i++) {
+    let max = 0;
+    const start = i * bucket;
+    const end = Math.min(start + bucket, L);
+    for (let j = start; j < end; j++) {
+      const v = Math.abs(samples[j]);
+      if (v > max) max = v;
     }
-
-    const chunks: Buffer[] = [];
-    proc.stdout.on("data", (d: Buffer) => chunks.push(d));
-    proc.on("error", () => resolve(null));
-    proc.on("close", (code) => {
-      if (code !== 0 || !chunks.length) {
-        resolve(null);
-        return;
-      }
-      const buf = Buffer.concat(chunks);
-      const usable = buf.byteLength - (buf.byteLength % 2);
-      if (usable <= 0) {
-        resolve(null);
-        return;
-      }
-      const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + usable);
-      const samples = new Int16Array(ab);
-      const L = samples.length;
-      const P = Math.min(numPeaks, L);
-      const bucket = Math.floor(L / P) || 1;
-      const peaks: number[] = [];
-      for (let i = 0; i < P; i++) {
-        let max = 0;
-        const start = i * bucket;
-        const end = Math.min(start + bucket, L);
-        for (let j = start; j < end; j++) {
-          const v = Math.abs(samples[j]);
-          if (v > max) max = v;
-        }
-        peaks.push(Number((max / 32768).toFixed(3)));
-      }
-      resolve(peaks);
-    });
-
-    proc.stdin.on("error", () => {});
-    proc.stdin.write(input);
-    proc.stdin.end();
-  });
+    peaks.push(Number((max / 32768).toFixed(3)));
+  }
+  return peaks;
 }
