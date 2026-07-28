@@ -22,6 +22,7 @@ Each meeting shows a **custom waveform audio player** (click anywhere on the wav
 - **Retry on failed save**: if storing the audio fails (e.g. a server error), the recording is kept in memory and you can **Retry** the upload without re-recording, or **Download a local copy** of the raw audio as a safety net.
 - **Import an audio file** (up to 180 min) to process it through the same pipeline — useful to recover a downloaded backup copy. Any input format the server's ffmpeg can read is accepted; it is **always transcoded to Opus** on upload (the save fails rather than storing a non-Opus file).
 - **Speaker diarization** with an optional participant-count hint (upper bound).
+- **Optional LLM transcript cleanup**: a one-click step that corrects obvious ASR errors using the conversation context (Catalan b/v homophones like *bicis*→*vicis*, mis-heard words, word boundaries) **without** summarizing, translating or inventing content — keeping speakers and order. The cleaned transcript is what's shown, exported and fed to the minutes. Runs in chunks so long meetings fit the model limits.
 - **Detailed minutes** in Catalan that reference the speakers; the LLM is told the diarization may be imperfect and to fix obvious attribution errors from context.
 - **Persistent history** in a left sidebar (most recent first, with a status pill); click any meeting to view its audio, transcript and minutes.
 - **Audio archive** in Opus (mono, 16 kHz, 32 kbps), played through a **custom canvas waveform player** — the amplitude peaks are precomputed on save and drawn as a bar chart, normalized so the loudest peak fills the full height; click anywhere on the wave to seek (with a range-slider fallback if no peaks). Downloadable from the history.
@@ -158,20 +159,28 @@ pm2 save
 Things to configure:
 
 - **HTTPS is mandatory.** Without a secure connection, browsers (especially Safari on iPhone) **block the microphone**. Add a certificate (e.g. Let's Encrypt).
-- **nginx as a reverse proxy:** raise the body-size limit so a 2-hour audio file (20–40 MB) fits, and extend the timeouts:
+- **Three body-size limits must all be raised** or large uploads (long recordings, imported files) get truncated or rejected:
+  1. **nginx** reverse proxy — otherwise a big upload is rejected with `413`:
 
-  ```nginx
-  client_max_body_size 100M;
-  proxy_read_timeout 300s;
-  proxy_send_timeout 300s;
-  ```
+     ```nginx
+     client_max_body_size 200M;
+     proxy_read_timeout 300s;
+     proxy_send_timeout 300s;
+     ```
+  2. **Next.js** — the request body passes through the auth middleware, which Next buffers with a **default 10 MB limit** that **silently truncates** the body (you get only the first 10 MB). Raised in `next.config.mjs`:
+
+     ```js
+     experimental: { proxyClientMaxBodySize: "200mb" }
+     // Next < 16.2.12 uses `middlewareClientMaxBodySize`
+     ```
+  3. **PM2** `max_memory_restart` — a large upload is buffered in memory, so a low cap (e.g. `500M`) makes PM2 **restart the process mid-transcode**. Set to `1G` in `ecosystem.config.js`.
 
 - Start it with PM2 using the bundled server (`pm2 start ecosystem.config.js`), ideally with boot persistence.
 
 ## Using it from an iPhone (Safari)
 
 - Safari records in `mp4/aac` (not webm); the app handles it automatically (the server transcodes to Opus regardless).
-- **Long recordings** are captured with a `timeslice` so the `MediaRecorder` flushes chunks every few seconds instead of buffering everything until you stop. Without this, iOS Safari caps the recorder's internal buffer (~10 MB, ≈ 28 min at 48 kbps) and **silently truncates** longer recordings.
+- **Long recordings** are captured with a `timeslice` so the `MediaRecorder` flushes chunks every few seconds instead of buffering everything until you stop (a safeguard against the recorder's internal buffer on iOS). Note: the main cause of truncated long recordings/imports turned out to be the **server body-size limits** above (Next's 10 MB default), not the recorder.
 - During any processing step the app requests a **Wake Lock** (acquired inside the button tap, as iOS requires) to keep the screen on, and re-acquires it when the tab becomes visible again (listening to the sentinel's `release` event). Even so, **do not lock the phone or switch apps** while recording or processing: iOS suspends the page, which can pause capture and drop the wake lock. Thanks to the three-step flow, if this happens the already-completed steps are safe, and the transcription step resumes on its own when you reopen the meeting.
 
 ## Notes and limits

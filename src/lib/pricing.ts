@@ -26,7 +26,8 @@ export interface MeetingCost {
 /** Cost aproximat en euros del processament d'una reunió. */
 export function meetingCost(m: Meeting): MeetingCost | null {
   const hasDuration = typeof m.durationSec === "number" && m.durationSec > 0;
-  const hasLlm = !!m.llm;
+  const usages = [m.llm, m.cleanLlm].filter((u): u is NonNullable<typeof u> => !!u);
+  const hasLlm = usages.length > 0;
   if (!hasDuration && !hasLlm) return null;
 
   const transcriptionUsd = hasDuration
@@ -35,12 +36,15 @@ export function meetingCost(m: Meeting): MeetingCost | null {
     : 0;
 
   let llmUsd = 0;
-  if (m.llm) {
-    const p = LLM_PRICES[m.llm.model];
+  let missingPrice = false;
+  for (const u of usages) {
+    const p = LLM_PRICES[u.model];
     if (p) {
-      llmUsd =
-        (m.llm.inputTokens / 1_000_000) * p.in +
-        (m.llm.outputTokens / 1_000_000) * p.out;
+      llmUsd +=
+        (u.inputTokens / 1_000_000) * p.in +
+        (u.outputTokens / 1_000_000) * p.out;
+    } else {
+      missingPrice = true;
     }
   }
 
@@ -49,7 +53,7 @@ export function meetingCost(m: Meeting): MeetingCost | null {
     transcriptionEur: transcriptionUsd * USD_TO_EUR,
     llmEur: llmUsd * USD_TO_EUR,
     totalEur: totalUsd * USD_TO_EUR,
-    partial: !hasDuration || (hasLlm && !LLM_PRICES[m.llm!.model]),
+    partial: !hasDuration || missingPrice,
   };
 }
 

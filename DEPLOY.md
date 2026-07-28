@@ -138,13 +138,25 @@ propietari correcte, ja que corre com `scribaai`) → arrenca amb PM2 → esborr
 ## 5. Ajusta l'nginx del site
 
 CloudPanel → site → **Vhost**, afegeix dins el bloc server (imprescindible el
-`client_max_body_size` o l'àudio de 2 h dona error 413):
+`client_max_body_size` o l'àudio llarg dona error 413):
 
 ```nginx
-client_max_body_size 100M;
+client_max_body_size 200M;
 proxy_read_timeout 300s;
 proxy_send_timeout 300s;
 ```
+
+> ⚠️ **Tres límits han d'anar alineats** o els àudios grans (gravacions llargues
+> o importacions) es tallen o es rebutgen:
+> 1. **nginx** `client_max_body_size 200M` (aquí) — si no, `413`.
+> 2. **Next** `experimental.proxyClientMaxBodySize: "200mb"` a `next.config.mjs`
+>    — el cos passa pel middleware d'auth i Next el bufferitza amb un límit de
+>    **10 MB per defecte que trunca en silenci**. (Next < 16.2.12: la clau és
+>    `middlewareClientMaxBodySize`; no es poden posar les dues alhora.)
+> 3. **PM2** `max_memory_restart: "1G"` a `ecosystem.config.js` — el cos gran es
+>    bufferitza en memòria; amb `500M` PM2 reiniciava el procés a mitja
+>    transcodificació. Després de canviar-ho: `pm2 delete scribaai && pm2 start
+>    ecosystem.config.js && pm2 save` (un *reload* no sempre aplica el límit nou).
 
 ## 6. SSL
 
@@ -192,6 +204,17 @@ bash deploy.sh
   (`scribaai`) **no és sudoer** (i sovint no té contrasenya; entres per clau SSH).
   No facis servir `sudo` amb aquest usuari: treballa dins de la seva carpeta sense
   `sudo`, o entra com a **root** per a operacions que el necessitin.
+- **Àudio truncat / no desat amb fitxers grans (import o gravació llarga)** →
+  revisa els **tres límits** alineats (nginx `200M` · Next `proxyClientMaxBodySize`
+  `200mb` · PM2 `max_memory_restart` `1G`). Símptomes al log: `Request body
+  exceeded 10MB` (límit de Next que trunca en silenci) o reinicis `✓ Ready in 0ms`
+  a mitja petició (PM2 mata el procés per memòria → `opus=0` i no es desa). Recorda
+  recrear el procés perquè el límit de memòria s'apliqui: `pm2 delete scribaai &&
+  pm2 start ecosystem.config.js && pm2 save`.
+- **`Config options proxyClientMaxBodySize i middlewareClientMaxBodySize cannot be
+  set at the same time`** (build) → posa'n **només una** a `next.config.mjs`
+  (`proxyClientMaxBodySize` a 16.2.12/actual; `middlewareClientMaxBodySize` a
+  versions anteriors).
 - **`npm -g` dona `EACCES`** → amb nvm actiu no cal root; si no uses nvm, posa
   `npm config set prefix ~/.npm-global` i afegeix `~/.npm-global/bin` al PATH.
 - **`EADDRINUSE: address already in use :::3000`** → un altre site ja té aquell

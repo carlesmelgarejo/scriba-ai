@@ -39,9 +39,6 @@ export async function POST(req: NextRequest) {
     // (p. ex. ffmpeg no disponible o format no vàlid), no desem res i retornem
     // error, així el client pot reintentar sense perdre l'àudio.
     const opus = await transcodeToOpus(bytes);
-    console.log(
-      `[meetings] rebut=${bytes.length} bytes · opus=${opus?.length ?? 0} bytes`
-    );
     if (!opus) {
       return NextResponse.json(
         {

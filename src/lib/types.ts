@@ -56,7 +56,9 @@ export interface Meeting {
   durationSec?: number; // durada de l'àudio gravat (per calcular el cost)
   peaks?: number[]; // forma d'ona (envelope) per al reproductor
   llm?: LlmUsage; // ús de l'LLM en generar l'acta (per calcular el cost)
-  utterances: Utterance[]; // buit fins que es transcriu
+  cleanLlm?: LlmUsage; // ús de l'LLM en netejar la transcripció
+  utterances: Utterance[]; // transcripció crua; buit fins que es transcriu
+  cleanedUtterances?: Utterance[]; // transcripció corregida per l'LLM (opcional)
   acta: Acta | null; // null fins que es genera
 }
 
@@ -68,12 +70,34 @@ export interface MeetingSummary {
   hasAudio: boolean;
 }
 
+/** Transcripció a mostrar/usar: la corregida si existeix, si no la crua. */
+export function displayUtterances(m: {
+  utterances: Utterance[];
+  cleanedUtterances?: Utterance[];
+}): Utterance[] {
+  return m.cleanedUtterances && m.cleanedUtterances.length
+    ? m.cleanedUtterances
+    : m.utterances;
+}
+
+/** Una acta té contingut real (no és un objecte buit d'un intent fallit). */
+export function actaHasContent(a: Acta | null): a is Acta {
+  return (
+    !!a &&
+    (!!a.resum ||
+      a.participants.length > 0 ||
+      a.punts_tractats.length > 0 ||
+      a.acords.length > 0 ||
+      a.tasques.length > 0)
+  );
+}
+
 export function meetingStatus(m: {
   acta: Acta | null;
   utterances: Utterance[];
   transcriptId?: string;
 }): MeetingStatus {
-  if (m.acta) return "done";
+  if (actaHasContent(m.acta)) return "done";
   if (m.utterances && m.utterances.length) return "transcribed";
   if (m.transcriptId) return "transcribing";
   return "audio";

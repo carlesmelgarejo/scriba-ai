@@ -47,6 +47,16 @@ export async function checkTranscription(
   return jsonOrThrow(res, "No s'ha pogut consultar la transcripció");
 }
 
+/** Pas opcional: neteja/corregeix la transcripció amb l'LLM. */
+export async function cleanTranscript(id: string): Promise<Meeting> {
+  const res = await fetch(`/api/meetings/${id}/clean`, { method: "POST" });
+  const data = await jsonOrThrow<{ meeting: Meeting }>(
+    res,
+    "No s'ha pogut netejar la transcripció"
+  );
+  return data.meeting;
+}
+
 /** Pas 3: genera l'acta a partir de la transcripció. */
 export async function generateActa(id: string): Promise<Meeting> {
   const res = await fetch(`/api/meetings/${id}/acta`, { method: "POST" });

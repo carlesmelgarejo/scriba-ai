@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMeeting, updateMeeting } from "@/lib/store";
-import { displayUtterances } from "@/lib/types";
-import { generateActa } from "@/lib/acta";
+import { cleanTranscript } from "@/lib/clean";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
-/** Pas 3: genera l'acta a partir de la transcripció ja desada. */
+/** Pas opcional: neteja/corregeix la transcripció crua amb l'LLM. */
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -19,22 +18,21 @@ export async function POST(
     }
     if (!meeting.utterances.length) {
       return NextResponse.json(
-        { error: "Cal transcriure abans de generar l'acta" },
+        { error: "Cal transcriure abans de netejar" },
         { status: 400 }
       );
     }
 
-    const { acta, usage } = await generateActa(displayUtterances(meeting));
+    const { utterances, usage } = await cleanTranscript(meeting.utterances);
     const updated = await updateMeeting(id, {
-      acta,
-      title: acta.titol,
-      llm: usage,
+      cleanedUtterances: utterances,
+      cleanLlm: usage,
     });
     return NextResponse.json({ meeting: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconegut";
     return NextResponse.json(
-      { error: `No s'ha pogut generar l'acta: ${message}` },
+      { error: `No s'ha pogut netejar la transcripció: ${message}` },
       { status: 500 }
     );
   }

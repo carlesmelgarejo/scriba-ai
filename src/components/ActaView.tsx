@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Meeting } from "@/lib/types";
-import { meetingStatus } from "@/lib/types";
+import { meetingStatus, actaHasContent, displayUtterances } from "@/lib/types";
 import {
   actaToMarkdown,
   transcriptToMarkdown,
@@ -13,6 +13,7 @@ import { meetingCost, formatEur } from "@/lib/pricing";
 import {
   startTranscription,
   checkTranscription,
+  cleanTranscript,
   generateActa,
 } from "@/lib/api";
 import { useWakeLock } from "@/hooks/useWakeLock";
@@ -78,14 +79,18 @@ function ExportButton({ onClick }: { onClick: () => void }) {
 
 export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
   const wake = useWakeLock();
-  const [working, setWorking] = useState<null | "transcribing" | "generating">(
-    null
-  );
+  const [working, setWorking] = useState<
+    null | "transcribing" | "cleaning" | "generating"
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const pollingRef = useRef(false);
 
   const status = meetingStatus(meeting);
-  const { acta, utterances } = meeting;
+  const { acta } = meeting;
+  const transcript = displayUtterances(meeting);
+  const isCleaned = !!(
+    meeting.cleanedUtterances && meeting.cleanedUtterances.length
+  );
   const title = meeting.title || acta?.titol || formatDateTime(meeting.createdAt);
   const slug = slugify(title);
   const audioUrl = meeting.hasAudio
@@ -139,6 +144,21 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
     }
   }
 
+  async function handleClean() {
+    setError(null);
+    setWorking("cleaning");
+    await wake.acquire();
+    try {
+      const updated = await cleanTranscript(meeting.id);
+      onUpdated(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error netejant la transcripció");
+    } finally {
+      await wake.release();
+      setWorking(null);
+    }
+  }
+
   async function handleActa() {
     setError(null);
     setWorking("generating");
@@ -155,11 +175,11 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
   }
 
   const exportActa = () =>
-    acta && downloadText(`acta-${slug}.md`, actaToMarkdown(acta, utterances));
+    acta && downloadText(`acta-${slug}.md`, actaToMarkdown(acta, transcript));
   const exportTranscript = () =>
     downloadText(
       `transcripcio-${slug}.md`,
-      transcriptToMarkdown(utterances, title)
+      transcriptToMarkdown(transcript, title)
     );
 
   const transcribing = status === "transcribing" || working === "transcribing";
@@ -231,8 +251,8 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
         </div>
       )}
 
-      {/* Acta (si existeix) */}
-      {acta && (
+      {/* Acta (si té contingut real) */}
+      {actaHasContent(acta) && (
         <CollapsibleSection
           title="Acta"
           card={false}
@@ -289,16 +309,14 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
       )}
 
       {/* Transcripció (si existeix) */}
-      {utterances.length > 0 && (
+      {transcript.length > 0 && (
         <CollapsibleSection
-          title="Transcripció"
+          title={isCleaned ? "Transcripció (corregida)" : "Transcripció"}
           card={false}
-          actions={
-            <ExportButton onClick={exportTranscript} />
-          }
+          actions={<ExportButton onClick={exportTranscript} />}
         >
           <div className="transcript">
-            {utterances.map((u, i) => (
+            {transcript.map((u, i) => (
               <p className="utterance" key={i}>
                 <span className="speaker">{u.speaker}</span>
                 {u.text}
@@ -306,6 +324,21 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
             ))}
           </div>
         </CollapsibleSection>
+      )}
+
+      {/* Pas opcional: netejar/corregir la transcripció abans de l'acta */}
+      {status === "transcribed" && !isCleaned && (
+        <div className="step-action">
+          {working === "cleaning" ? (
+            <span className="step-status">
+              <span className="spinner" /> Corregint la transcripció…
+            </span>
+          ) : (
+            <button type="button" className="btn ghost" onClick={handleClean}>
+              Netejar transcripció (opcional)
+            </button>
+          )}
+        </div>
       )}
 
       {/* Pas 3: generar acta */}
@@ -323,7 +356,9 @@ export function MeetingView({ meeting, onClose, onUpdated }: MeetingViewProps) {
         </div>
       )}
 
-      {(transcribing || working === "generating") && <ProcessingWarning />}
+      {(transcribing ||
+        working === "cleaning" ||
+        working === "generating") && <ProcessingWarning />}
 
       {error && <div className="error">{error}</div>}
     </section>

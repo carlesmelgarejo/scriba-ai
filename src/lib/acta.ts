@@ -78,8 +78,27 @@ export async function generateActa(
 ): Promise<{ acta: Acta; usage: LlmUsage }> {
   const text = labeledTranscript(utterances);
   const result = await generateWithLLM(text, PROMPT);
+  const acta = buildActa(extractJson(result.text));
+
+  // Si l'acta ha tornat buida, la resposta del model no s'ha pogut interpretar
+  // (sovint perquè s'ha truncat). Fem que falli de forma visible en comptes de
+  // desar una acta buida que després sembla la transcripció.
+  const isEmpty =
+    !acta.resum &&
+    acta.participants.length === 0 &&
+    acta.punts_tractats.length === 0 &&
+    acta.acords.length === 0 &&
+    acta.tasques.length === 0;
+  if (isEmpty) {
+    const hint =
+      result.finishReason === "length"
+        ? "la resposta del model s'ha truncat (transcripció massa llarga)"
+        : "no s'ha pogut interpretar la resposta del model";
+    throw new Error(`L'acta ha tornat buida: ${hint}. Torna-ho a provar.`);
+  }
+
   return {
-    acta: buildActa(extractJson(result.text)),
+    acta,
     usage: {
       model: result.model,
       inputTokens: result.inputTokens,

@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type { Acta, Meeting, MeetingSummary, Utterance } from "./types";
-import { meetingStatus } from "./types";
+import { meetingStatus, displayUtterances } from "./types";
 import { actaToMarkdown } from "./format";
 import { extractPeaks } from "./audio";
 
@@ -36,7 +36,11 @@ function normalize(raw: unknown): Meeting {
     durationSec: m.durationSec,
     peaks: m.peaks,
     llm: m.llm,
+    cleanLlm: m.cleanLlm,
     utterances: Array.isArray(m.utterances) ? m.utterances : [],
+    cleanedUtterances: Array.isArray(m.cleanedUtterances)
+      ? m.cleanedUtterances
+      : undefined,
     acta: m.acta ?? null,
   };
 }
@@ -51,7 +55,7 @@ async function writeMeeting(meeting: Meeting): Promise<void> {
   if (meeting.acta) {
     await fs.writeFile(
       path.join(DATA_DIR, `${meeting.id}.md`),
-      actaToMarkdown(meeting.acta, meeting.utterances),
+      actaToMarkdown(meeting.acta, displayUtterances(meeting)),
       "utf8"
     );
   }

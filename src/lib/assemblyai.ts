@@ -104,6 +104,7 @@ export interface LlmResult {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  finishReason: string;
 }
 
 /**
@@ -113,17 +114,20 @@ export interface LlmResult {
  */
 export async function generateWithLLM(
   inputText: string,
-  prompt: string
+  prompt: string,
+  userLabel = "Transcripció de la reunió:\n\n"
 ): Promise<LlmResult> {
   const res = await fetch(LLM_GATEWAY, {
     method: "POST",
     headers: headers(true),
     body: JSON.stringify({
       model: LLM_MODEL,
-      max_tokens: 2000,
+      // Prou marge perquè el JSON de l'acta d'una reunió llarga no es talli
+      // (amb 2000 tokens es truncava i el JSON quedava invàlid → acta buida).
+      max_tokens: 8000,
       messages: [
         { role: "system", content: prompt },
-        { role: "user", content: `Transcripció de la reunió:\n\n${inputText}` },
+        { role: "user", content: `${userLabel}${inputText}` },
       ],
     }),
   });
@@ -132,7 +136,10 @@ export async function generateWithLLM(
     throw new Error(`Error de l'LLM Gateway (${res.status}): ${detail}`);
   }
   const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
+    choices?: {
+      message?: { content?: string };
+      finish_reason?: string;
+    }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   return {
@@ -140,5 +147,6 @@ export async function generateWithLLM(
     model: LLM_MODEL,
     inputTokens: data.usage?.prompt_tokens ?? 0,
     outputTokens: data.usage?.completion_tokens ?? 0,
+    finishReason: data.choices?.[0]?.finish_reason ?? "",
   };
 }
