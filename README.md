@@ -171,7 +171,8 @@ Things to configure:
 ## Using it from an iPhone (Safari)
 
 - Safari records in `mp4/aac` (not webm); the app handles it automatically (the server transcodes to Opus regardless).
-- During any processing step the app requests a **Wake Lock** (acquired inside the button tap, as iOS requires) to keep the screen on. Even so, **do not lock the phone or switch apps** while a step runs: iOS suspends the page. Thanks to the three-step flow, if this happens the already-completed steps are safe, and the transcription step resumes on its own when you reopen the meeting.
+- **Long recordings** are captured with a `timeslice` so the `MediaRecorder` flushes chunks every few seconds instead of buffering everything until you stop. Without this, iOS Safari caps the recorder's internal buffer (~10 MB, ≈ 28 min at 48 kbps) and **silently truncates** longer recordings.
+- During any processing step the app requests a **Wake Lock** (acquired inside the button tap, as iOS requires) to keep the screen on, and re-acquires it when the tab becomes visible again (listening to the sentinel's `release` event). Even so, **do not lock the phone or switch apps** while recording or processing: iOS suspends the page, which can pause capture and drop the wake lock. Thanks to the three-step flow, if this happens the already-completed steps are safe, and the transcription step resumes on its own when you reopen the meeting.
 
 ## Notes and limits
 

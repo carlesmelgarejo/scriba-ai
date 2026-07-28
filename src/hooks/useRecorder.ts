@@ -49,7 +49,10 @@ export function useRecorder(): UseRecorder {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      recorder.start();
+      // timeslice: el gravador emet un tros cada 5 s en comptes d'acumular-ho
+      // tot en un únic buffer intern. Sense això, iOS Safari talla les gravacions
+      // llargues en omplir-se la memòria del MediaRecorder (~10 MB → ~28 min).
+      recorder.start(5000);
       recorderRef.current = recorder;
 
       setSeconds(0);

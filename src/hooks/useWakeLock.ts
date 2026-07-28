@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 interface WakeLockSentinelLike {
   release: () => Promise<void>;
+  addEventListener?: (type: "release", cb: () => void) => void;
 }
 
 async function requestWakeLock(): Promise<WakeLockSentinelLike | null> {
@@ -24,10 +25,20 @@ export function useWakeLock() {
   const ref = useRef<WakeLockSentinelLike | null>(null);
   const activeRef = useRef(false);
 
+  // Desa el sentinel i, quan el sistema l'alliberi (p. ex. en apagar-se la
+  // pantalla), neteja la referència perquè es pugui tornar a demanar.
+  const setSentinel = useCallback((s: WakeLockSentinelLike | null) => {
+    if (!s) return;
+    s.addEventListener?.("release", () => {
+      ref.current = null;
+    });
+    ref.current = s;
+  }, []);
+
   const acquire = useCallback(async () => {
     activeRef.current = true;
-    if (!ref.current) ref.current = await requestWakeLock();
-  }, []);
+    if (!ref.current) setSentinel(await requestWakeLock());
+  }, [setSentinel]);
 
   const release = useCallback(async () => {
     activeRef.current = false;
@@ -42,12 +53,12 @@ export function useWakeLock() {
         activeRef.current &&
         !ref.current
       ) {
-        ref.current = await requestWakeLock();
+        setSentinel(await requestWakeLock());
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
+  }, [setSentinel]);
 
   useEffect(() => {
     return () => {
